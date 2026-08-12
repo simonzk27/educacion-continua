@@ -108,56 +108,77 @@ export default function Horarios() {
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('nombre'))
-    return onSnapshot(q, (snap) => {
-      setUsuarios(
-        snap.docs.map((d) => {
-          const data = d.data()
-          return {
-            id: d.id,
-            nombre: data.nombre ?? '',
-            sede: (data.sede as Sede) ?? null,
-            activo: data.activo !== false,
-          }
-        }),
-      )
-      setLoadingUsuarios(false)
-    })
-  }, [])
-
-  useEffect(() => {
-    return onSnapshot(collection(db, 'cursos'), (snap) => {
-      const map: Record<string, string> = {}
-      snap.docs.forEach((d) => {
-        map[d.id] = (d.data().nombre as string) ?? d.id
-      })
-      setCursoNombres(map)
-      setLoadingCursos(false)
-    })
-  }, [])
-
-  useEffect(() => {
-    return onSnapshot(collectionGroup(db, 'inscripciones'), (snap) => {
-      setInscripciones(
-        snap.docs
-          .map((d): Inscripcion | null => {
+    return onSnapshot(
+      q,
+      (snap) => {
+        setUsuarios(
+          snap.docs.map((d) => {
             const data = d.data()
-            const userId = data.userId as string | undefined
-            const cursoId = d.ref.parent.parent?.id
-            if (!userId || !cursoId) return null
             return {
-              userId,
-              cursoId,
-              dias: (data.dias as Dia[]) ?? [],
-              hora: (data.hora as string | undefined) ?? null,
-              duracionMin: (data.duracionMin as number | undefined) ?? null,
-              vigenciaInicio: (data.vigenciaInicio as string | undefined) ?? null,
-              vigenciaFin: (data.vigenciaFin as string | undefined) ?? null,
+              id: d.id,
+              nombre: data.nombre ?? '',
+              sede: (data.sede as Sede) ?? null,
+              activo: data.activo !== false,
             }
-          })
-          .filter((v): v is Inscripcion => v !== null),
-      )
-      setLoadingInscripciones(false)
-    })
+          }),
+        )
+        setLoadingUsuarios(false)
+      },
+      (err) => {
+        console.error('[Horarios] fallo listener users:', err)
+        setLoadingUsuarios(false)
+      },
+    )
+  }, [])
+
+  useEffect(() => {
+    return onSnapshot(
+      collection(db, 'cursos'),
+      (snap) => {
+        const map: Record<string, string> = {}
+        snap.docs.forEach((d) => {
+          map[d.id] = (d.data().nombre as string) ?? d.id
+        })
+        setCursoNombres(map)
+        setLoadingCursos(false)
+      },
+      (err) => {
+        console.error('[Horarios] fallo listener cursos:', err)
+        setLoadingCursos(false)
+      },
+    )
+  }, [])
+
+  useEffect(() => {
+    return onSnapshot(
+      collectionGroup(db, 'inscripciones'),
+      (snap) => {
+        setInscripciones(
+          snap.docs
+            .map((d): Inscripcion | null => {
+              const data = d.data()
+              const userId = data.userId as string | undefined
+              const cursoId = d.ref.parent.parent?.id
+              if (!userId || !cursoId) return null
+              return {
+                userId,
+                cursoId,
+                dias: (data.dias as Dia[]) ?? [],
+                hora: (data.hora as string | undefined) ?? null,
+                duracionMin: (data.duracionMin as number | undefined) ?? null,
+                vigenciaInicio: (data.vigenciaInicio as string | undefined) ?? null,
+                vigenciaFin: (data.vigenciaFin as string | undefined) ?? null,
+              }
+            })
+            .filter((v): v is Inscripcion => v !== null),
+        )
+        setLoadingInscripciones(false)
+      },
+      (err) => {
+        console.error('[Horarios] fallo listener inscripciones:', err)
+        setLoadingInscripciones(false)
+      },
+    )
   }, [])
 
   useEffect(() => {

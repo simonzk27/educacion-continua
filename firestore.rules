@@ -27,5 +27,9 @@ service cloud.firestore {
         allow write: if isAdmin();
       }
     }
+
+    match /{path=**}/inscripciones/{userId} {
+      allow read: if isSignedIn();
+    }
   }
 }
