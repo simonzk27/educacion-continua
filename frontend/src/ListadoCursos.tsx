@@ -16,7 +16,7 @@ import { db } from './firebase'
 
 type Estado = 'Activo' | 'Inactivo' | 'Próximo'
 type Tipo = 'Natural' | 'Academia'
-type DuracionUnidad = 'Semanas' | 'Cursos'
+type DuracionUnidad = 'Semanas' | 'Lecciones'
 type Tab = 'Todos los cursos' | Tipo
 
 type Curso = {
@@ -39,7 +39,7 @@ const estadoStyles: Record<Estado, string> = {
 
 const estados: Estado[] = ['Activo', 'Inactivo', 'Próximo']
 const tipos: Tipo[] = ['Natural', 'Academia']
-const duracionUnidades: DuracionUnidad[] = ['Semanas', 'Cursos']
+const duracionUnidades: DuracionUnidad[] = ['Semanas', 'Lecciones']
 const tabs: Tab[] = ['Todos los cursos', 'Natural', 'Academia']
 
 const emptyForm = {
