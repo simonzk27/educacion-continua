@@ -5,6 +5,18 @@
 @theme {
   --animate-shake: shake 0.4s ease-in-out;
   --animate-fade-in: fade-in 0.2s ease-out;
+
+  /* NaturalSlim brand green — overrides Tailwind's blue scale for the light theme accent. */
+  --color-blue-50: #eff8ea;
+  --color-blue-100: #dbf0cc;
+  --color-blue-200: #b8e1a0;
+  --color-blue-300: #92cf71;
+  --color-blue-400: #6fb94c;
+  --color-blue-500: #529f34;
+  --color-blue-600: #418228;
+  --color-blue-700: #33661f;
+  --color-blue-800: #295118;
+  --color-blue-900: #213f14;
 }
 
 @keyframes shake {
