@@ -144,6 +144,7 @@ export default function ListadoCursos() {
     setAssigningId(usuario.id)
     try {
       await setDoc(doc(db, 'cursos', assignCurso.id, 'inscripciones', usuario.id), {
+        userId: usuario.id,
         nombre: usuario.nombre,
         email: usuario.email,
         rol: usuario.rol,

@@ -1,17 +1,28 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Plus, Pencil, X, CheckCircle2 } from 'lucide-react'
 import { createUserWithEmailAndPassword, signOut as secondarySignOut, type AuthError } from 'firebase/auth'
-import { collection, doc, setDoc, updateDoc, onSnapshot, orderBy, query } from 'firebase/firestore'
+import {
+  collection,
+  collectionGroup,
+  doc,
+  setDoc,
+  updateDoc,
+  onSnapshot,
+  orderBy,
+  query,
+} from 'firebase/firestore'
 import { db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
 
 type Rol = 'Admin' | 'Usuario'
 type Estado = 'Activo' | 'Inactivo'
+type Sede = 'Colombia' | 'USA' | 'CMC Entrenamiento'
 
 type Colaborador = {
   id: string
   nombre: string
   email: string
   rol: Rol
+  sede: Sede | null
   activo: boolean
 }
 
@@ -20,6 +31,7 @@ const firestoreToRol: Record<string, Rol> = { admin: 'Admin', usuario: 'Usuario'
 
 const roles: Rol[] = ['Admin', 'Usuario']
 const estados: Estado[] = ['Activo', 'Inactivo']
+const sedes: Sede[] = ['Colombia', 'USA', 'CMC Entrenamiento']
 
 const estadoStyles: Record<Estado, string> = {
   Activo: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
@@ -37,12 +49,15 @@ const emptyForm = {
   email: '',
   password: '',
   rol: '' as Rol | '',
+  sede: '' as Sede | '',
   estado: '' as Estado | '',
 }
 
 export default function Colaboradores() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
   const [loading, setLoading] = useState(true)
+  const [cursoNombres, setCursoNombres] = useState<Record<string, string>>({})
+  const [inscripciones, setInscripciones] = useState<{ userId: string; cursoId: string }[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -61,6 +76,7 @@ export default function Colaboradores() {
             nombre: data.nombre ?? '',
             email: data.email ?? '',
             rol: firestoreToRol[data.rol] ?? 'Usuario',
+            sede: (data.sede as Sede) ?? null,
             activo: data.activo !== false,
           }
         }),
@@ -68,6 +84,39 @@ export default function Colaboradores() {
       setLoading(false)
     })
   }, [])
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'cursos'), (snap) => {
+      const map: Record<string, string> = {}
+      snap.docs.forEach((d) => {
+        map[d.id] = (d.data().nombre as string) ?? d.id
+      })
+      setCursoNombres(map)
+    })
+  }, [])
+
+  useEffect(() => {
+    return onSnapshot(collectionGroup(db, 'inscripciones'), (snap) => {
+      setInscripciones(
+        snap.docs
+          .map((d) => {
+            const userId = d.data().userId as string | undefined
+            const cursoId = d.ref.parent.parent?.id
+            return userId && cursoId ? { userId, cursoId } : null
+          })
+          .filter((v): v is { userId: string; cursoId: string } => v !== null),
+      )
+    })
+  }, [])
+
+  const cursosPorColaborador = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    inscripciones.forEach(({ userId, cursoId }) => {
+      const nombre = cursoNombres[cursoId] ?? cursoId
+      map[userId] = [...(map[userId] ?? []), nombre]
+    })
+    return map
+  }, [inscripciones, cursoNombres])
 
   useEffect(() => {
     if (!toast) return
@@ -89,6 +138,7 @@ export default function Colaboradores() {
       email: colaborador.email,
       password: '',
       rol: colaborador.rol,
+      sede: colaborador.sede ?? '',
       estado: colaborador.activo ? 'Activo' : 'Inactivo',
     })
     setFormError(null)
@@ -111,6 +161,7 @@ export default function Colaboradores() {
       !form.email.trim() ||
       (!editingId && form.password.length < 6) ||
       !form.rol ||
+      !form.sede ||
       !form.estado
     ) {
       setFormError(
@@ -127,6 +178,7 @@ export default function Colaboradores() {
         await updateDoc(doc(db, 'users', editingId), {
           nombre: form.nombre.trim(),
           rol: rolToFirestore[form.rol],
+          sede: form.sede,
           activo: form.estado === 'Activo',
         })
         setToast('Colaborador actualizado correctamente.')
@@ -138,6 +190,7 @@ export default function Colaboradores() {
             nombre: form.nombre.trim(),
             email: form.email.trim(),
             rol: rolToFirestore[form.rol],
+            sede: form.sede,
             activo: form.estado === 'Activo',
           })
         } finally {
@@ -185,6 +238,8 @@ export default function Colaboradores() {
                 <th className="px-5 py-3 font-semibold">Nombre</th>
                 <th className="px-5 py-3 font-semibold">Correo</th>
                 <th className="px-5 py-3 font-semibold">Rol</th>
+                <th className="px-5 py-3 font-semibold">Sede</th>
+                <th className="px-5 py-3 font-semibold">Curso asociado</th>
                 <th className="px-5 py-3 font-semibold">Estado</th>
                 <th className="px-5 py-3 font-semibold" />
               </tr>
@@ -192,19 +247,20 @@ export default function Colaboradores() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={7} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : colaboradores.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={7} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
                     No hay colaboradores todavía.
                   </td>
                 </tr>
               ) : (
                 colaboradores.map((c) => {
                   const estado: Estado = c.activo ? 'Activo' : 'Inactivo'
+                  const cursos = cursosPorColaborador[c.id]
                   return (
                     <tr key={c.id}>
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
@@ -212,6 +268,10 @@ export default function Colaboradores() {
                       </td>
                       <td className="px-5 py-3 text-gray-400 dark:text-gray-500">{c.email}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.rol}</td>
+                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.sede ?? '–'}</td>
+                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
+                        {cursos && cursos.length > 0 ? cursos.join(', ') : 'Sin curso asignado'}
+                      </td>
                       <td className="px-5 py-3">
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${estadoStyles[estado]}`}
@@ -313,6 +373,25 @@ export default function Colaboradores() {
                   {roles.map((r) => (
                     <option key={r} value={r}>
                       {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="sede" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Sede
+                </label>
+                <select
+                  id="sede"
+                  value={form.sede}
+                  onChange={(e) => setForm({ ...form, sede: e.target.value as Sede })}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                >
+                  <option value="">Seleccionar...</option>
+                  {sedes.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
                     </option>
                   ))}
                 </select>
