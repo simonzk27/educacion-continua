@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Pencil, X, CheckCircle2 } from 'lucide-react'
+import {
+  Pencil,
+  X,
+  CheckCircle2,
+  CalendarClock,
+  Clock,
+  Timer,
+  CalendarDays,
+  CalendarRange,
+} from 'lucide-react'
 import { collection, collectionGroup, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
 import { db } from './firebase'
 
@@ -9,6 +18,15 @@ type Dia = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' 
 
 const dias: Dia[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const diaIndex: Record<Dia, number> = Object.fromEntries(dias.map((d, i) => [d, i])) as Record<Dia, number>
+const diaCorto: Record<Dia, string> = {
+  Lunes: 'Lu',
+  Martes: 'Ma',
+  Miércoles: 'Mi',
+  Jueves: 'Ju',
+  Viernes: 'Vi',
+  Sábado: 'Sá',
+  Domingo: 'Do',
+}
 
 type Usuario = {
   id: string
@@ -462,27 +480,32 @@ export default function Horarios() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Editar horario</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {editing.colaborador} · {editing.curso}
-                </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                  <CalendarClock className="h-5.5 w-5.5" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Editar horario</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {editing.colaborador} · {editing.curso}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-6 py-5">
               <div>
-                <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Días de la semana
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -492,23 +515,28 @@ export default function Horarios() {
                       <button
                         key={d}
                         type="button"
+                        title={d}
                         onClick={() => toggleDia(d)}
-                        className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                        className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold transition ${
                           activo
-                            ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-400'
-                            : 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
+                            ? 'bg-blue-600 text-white shadow-sm ring-4 ring-blue-100 dark:bg-indigo-500 dark:ring-indigo-500/20'
+                            : 'border border-gray-300 text-gray-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-400 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
                         }`}
                       >
-                        {d}
+                        {diaCorto[d]}
                       </button>
                     )
                   })}
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label htmlFor="hora" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="hora"
+                    className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    <Clock className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                     Hora
                   </label>
                   <input
@@ -516,11 +544,15 @@ export default function Horarios() {
                     type="time"
                     value={form.hora}
                     onChange={(e) => setForm({ ...form, hora: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                 </div>
-                <div className="flex-1">
-                  <label htmlFor="duracion" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div>
+                  <label
+                    htmlFor="duracion"
+                    className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    <Timer className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                     Duración (min)
                   </label>
                   <input
@@ -529,40 +561,66 @@ export default function Horarios() {
                     min="1"
                     value={form.duracionMin}
                     onChange={(e) => setForm({ ...form, duracionMin: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                 </div>
               </div>
 
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                "Guardar horario" deja el patrón vigente sin fecha de fin. "Programar mes" lo
-                limita hasta el último día del mes en curso.
-              </p>
+              <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-3.5 py-3 text-sm text-blue-800 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300">
+                <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" />
+                {form.dias.length > 0 && form.hora ? (
+                  <span>
+                    Se dictará <strong className="font-semibold">{[...form.dias].sort((a, b) => diaIndex[a] - diaIndex[b]).join(', ')}</strong> a las{' '}
+                    <strong className="font-semibold">{formatHora(form.hora)}</strong>
+                    {form.duracionMin ? (
+                      <>
+                        {' '}· <strong className="font-semibold">{form.duracionMin} min</strong>
+                      </>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="text-blue-700/70 dark:text-indigo-300/70">
+                    Seleccioná días y hora para ver el resumen del horario.
+                  </span>
+                )}
+              </div>
 
               {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
 
-              <div className="mt-2 flex flex-wrap justify-end gap-3">
+              <div className="mt-1 flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleProgramarMes}
+                    className="group flex flex-col items-center gap-1 rounded-xl border border-gray-300 px-3 py-2.5 text-gray-700 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-60 dark:border-gray-700 dark:text-gray-200 dark:hover:border-indigo-400 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300"
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                      <CalendarRange className="h-4 w-4" />
+                      {submitting ? 'Guardando...' : 'Programar mes'}
+                    </span>
+                    <span className="text-[11px] text-gray-400 group-hover:text-blue-500 dark:text-gray-500">
+                      Hasta {formatFecha(endOfMonthIso())}
+                    </span>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex flex-col items-center gap-1 rounded-xl bg-blue-600 px-3 py-2.5 text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                      <CalendarDays className="h-4 w-4" />
+                      {submitting ? 'Guardando...' : 'Guardar horario'}
+                    </span>
+                    <span className="text-[11px] text-blue-100 dark:text-indigo-100">Sin fecha de fin</span>
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="self-center text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
                   Cancelar
-                </button>
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={handleProgramarMes}
-                  className="rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 disabled:opacity-60 dark:border-indigo-400 dark:text-indigo-400 dark:hover:bg-indigo-500/10"
-                >
-                  {submitting ? 'Guardando...' : 'Programar mes'}
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
-                >
-                  {submitting ? 'Guardando...' : 'Guardar horario'}
                 </button>
               </div>
             </form>
