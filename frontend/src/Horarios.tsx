@@ -9,7 +9,7 @@ import {
   CalendarDays,
   CalendarRange,
 } from 'lucide-react'
-import { collection, collectionGroup, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore'
+import { collection, collectionGroup, doc, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
 
 type Sede = 'Colombia' | 'USA' | 'CMC Entrenamiento'
@@ -38,11 +38,20 @@ type Usuario = {
 type Inscripcion = {
   userId: string
   cursoId: string
+}
+
+type Horario = {
+  userId: string
+  cursoId: string
   dias: Dia[]
   hora: string | null
   duracionMin: number | null
   vigenciaInicio: string | null
   vigenciaFin: string | null
+}
+
+function horarioId(cursoId: string, userId: string): string {
+  return `${cursoId}_${userId}`
 }
 
 type Fila = {
@@ -109,9 +118,11 @@ export default function Horarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [cursoNombres, setCursoNombres] = useState<Record<string, string>>({})
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([])
+  const [horarios, setHorarios] = useState<Record<string, Horario>>({})
   const [loadingUsuarios, setLoadingUsuarios] = useState(true)
   const [loadingCursos, setLoadingCursos] = useState(true)
   const [loadingInscripciones, setLoadingInscripciones] = useState(true)
+  const [loadingHorarios, setLoadingHorarios] = useState(true)
 
   const [sede, setSede] = useState('Todas')
   const [colaborador, setColaborador] = useState('Todos')
@@ -178,15 +189,7 @@ export default function Horarios() {
               const userId = data.userId as string | undefined
               const cursoId = d.ref.parent.parent?.id
               if (!userId || !cursoId) return null
-              return {
-                userId,
-                cursoId,
-                dias: (data.dias as Dia[]) ?? [],
-                hora: (data.hora as string | undefined) ?? null,
-                duracionMin: (data.duracionMin as number | undefined) ?? null,
-                vigenciaInicio: (data.vigenciaInicio as string | undefined) ?? null,
-                vigenciaFin: (data.vigenciaFin as string | undefined) ?? null,
-              }
+              return { userId, cursoId }
             })
             .filter((v): v is Inscripcion => v !== null),
         )
@@ -200,12 +203,42 @@ export default function Horarios() {
   }, [])
 
   useEffect(() => {
+    return onSnapshot(
+      collection(db, 'horarios'),
+      (snap) => {
+        const map: Record<string, Horario> = {}
+        snap.docs.forEach((d) => {
+          const data = d.data()
+          const userId = data.userId as string | undefined
+          const cursoId = data.cursoId as string | undefined
+          if (!userId || !cursoId) return
+          map[d.id] = {
+            userId,
+            cursoId,
+            dias: (data.dias as Dia[]) ?? [],
+            hora: (data.hora as string | undefined) ?? null,
+            duracionMin: (data.duracionMin as number | undefined) ?? null,
+            vigenciaInicio: (data.vigenciaInicio as string | undefined) ?? null,
+            vigenciaFin: (data.vigenciaFin as string | undefined) ?? null,
+          }
+        })
+        setHorarios(map)
+        setLoadingHorarios(false)
+      },
+      (err) => {
+        console.error('[Horarios] fallo listener horarios:', err)
+        setLoadingHorarios(false)
+      },
+    )
+  }, [])
+
+  useEffect(() => {
     if (!toast) return
     const timer = setTimeout(() => setToast(null), 2500)
     return () => clearTimeout(timer)
   }, [toast])
 
-  const loading = loadingUsuarios || loadingCursos || loadingInscripciones
+  const loading = loadingUsuarios || loadingCursos || loadingInscripciones || loadingHorarios
 
   const usuariosPorId = useMemo(() => {
     const map: Record<string, Usuario> = {}
@@ -220,24 +253,25 @@ export default function Horarios() {
       .map((insc) => {
         const u = usuariosPorId[insc.userId]
         if (!u) return null
+        const h = horarios[horarioId(insc.cursoId, insc.userId)]
         return {
-          key: `${insc.cursoId}_${insc.userId}`,
+          key: horarioId(insc.cursoId, insc.userId),
           userId: insc.userId,
           cursoId: insc.cursoId,
           colaborador: u.nombre,
           sede: u.sede,
           activo: u.activo,
           curso: cursoNombres[insc.cursoId] ?? insc.cursoId,
-          dias: [...insc.dias].sort((a, b) => diaIndex[a] - diaIndex[b]),
-          hora: insc.hora,
-          duracionMin: insc.duracionMin,
-          vigenciaInicio: insc.vigenciaInicio,
-          vigenciaFin: insc.vigenciaFin,
+          dias: h ? [...h.dias].sort((a, b) => diaIndex[a] - diaIndex[b]) : [],
+          hora: h?.hora ?? null,
+          duracionMin: h?.duracionMin ?? null,
+          vigenciaInicio: h?.vigenciaInicio ?? null,
+          vigenciaFin: h?.vigenciaFin ?? null,
         }
       })
       .filter((f): f is Fila => f !== null)
       .sort((a, b) => a.colaborador.localeCompare(b.colaborador))
-  }, [inscripciones, usuariosPorId, cursoNombres])
+  }, [inscripciones, usuariosPorId, cursoNombres, horarios])
 
   const colaboradoresOpciones = useMemo(
     () => [...new Set(filas.map((f) => f.colaborador))].sort(),
@@ -296,6 +330,8 @@ export default function Horarios() {
     setSubmitting(true)
     try {
       const payload: Record<string, unknown> = {
+        userId: editing.userId,
+        cursoId: editing.cursoId,
         dias: form.dias,
         hora: form.hora,
         duracionMin: Number(form.duracionMin),
@@ -304,7 +340,7 @@ export default function Horarios() {
       if (!editing.vigenciaInicio) {
         payload.vigenciaInicio = todayIso()
       }
-      await updateDoc(doc(db, 'cursos', editing.cursoId, 'inscripciones', editing.userId), payload)
+      await setDoc(doc(db, 'horarios', horarioId(editing.cursoId, editing.userId)), payload, { merge: true })
       setToast('Horario guardado correctamente.')
       closeModal()
     } catch {

@@ -31,5 +31,10 @@ service cloud.firestore {
     match /{path=**}/inscripciones/{userId} {
       allow read: if isSignedIn();
     }
+
+    match /horarios/{horarioId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }
