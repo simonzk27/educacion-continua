@@ -37,7 +37,13 @@ function App() {
 
   let content: React.ReactNode
   if (activeView === 'mi-panel') {
-    content = <MiPanel nombre={nombre} onRegistrarAvance={() => setActiveView('registrar-avance')} />
+    content = (
+      <MiPanel
+        nombre={nombre}
+        userId={firebaseUser.uid}
+        onRegistrarAvance={() => setActiveView('registrar-avance')}
+      />
+    )
   } else if (activeView === 'registrar-avance') {
     content = <RegistrarAvance />
   } else if (activeView === 'dashboard-hoy') {
