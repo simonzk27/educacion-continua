@@ -184,6 +184,9 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+        <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+          Sesión más próxima programada
+        </p>
         {loading ? (
           <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
         ) : sesionObjetivo ? (
