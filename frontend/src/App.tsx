@@ -45,7 +45,7 @@ function App() {
       />
     )
   } else if (activeView === 'registrar-avance') {
-    content = <RegistrarAvance />
+    content = <RegistrarAvance userId={firebaseUser.uid} />
   } else if (activeView === 'dashboard-hoy') {
     content = <Dashboard />
   } else if (activeView === 'horarios') {

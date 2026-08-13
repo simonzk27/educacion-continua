@@ -1,19 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, collectionGroup, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, collectionGroup, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { db } from './firebase'
-
-type Dia = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo'
-type Modo = 'semanal' | 'mensual'
-
-const diaIndex: Record<Dia, number> = {
-  Lunes: 0,
-  Martes: 1,
-  Miércoles: 2,
-  Jueves: 3,
-  Viernes: 4,
-  Sábado: 5,
-  Domingo: 6,
-}
+import {
+  type Dia,
+  type Modo,
+  addDays,
+  formatFechaSesion,
+  formatHora,
+  ocurrenciasEntre,
+  todayIso,
+} from './scheduleUtils'
 
 type Curso = {
   id: string
@@ -32,85 +28,12 @@ type Horario = {
   vigenciaFin: string | null
 }
 
-const ultimosReportes = [
-  {
-    fecha: '31 jul 2026',
-    curso: 'Aprendiendo a aprender',
-    lecciones: 3,
-    aprendizaje: 'Aprendí a hacer mapas mentales antes de leer.',
-  },
-  {
-    fecha: '24 jul 2026',
-    curso: 'Aprendiendo a aprender',
-    lecciones: 2,
-    aprendizaje: 'La técnica de repaso espaciado me ayudó a retener.',
-  },
-  {
-    fecha: '17 jul 2026',
-    curso: 'Aprendiendo a aprender',
-    lecciones: 4,
-    aprendizaje: 'Identifiqué mis horas de mayor concentración.',
-  },
-]
-
-function dateToIso(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function todayIso(): string {
-  return dateToIso(new Date())
-}
-
-function addDays(iso: string, delta: number): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
-  dt.setDate(dt.getDate() + delta)
-  return dateToIso(dt)
-}
-
-function ocurrenciasEntre(h: Horario, desde: string, hasta: string): string[] {
-  if (h.modo === 'mensual') {
-    return h.fechas.filter((f) => f >= desde && f <= hasta).sort()
-  }
-  const diasSet = new Set(h.dias.map((d) => diaIndex[d]))
-  if (diasSet.size === 0) return []
-  const inicio = h.vigenciaInicio && h.vigenciaInicio > desde ? h.vigenciaInicio : desde
-  const fin = h.vigenciaFin && h.vigenciaFin < hasta ? h.vigenciaFin : hasta
-  if (inicio > fin) return []
-  const [iy, im, id] = inicio.split('-').map(Number)
-  const [fy, fm, fd] = fin.split('-').map(Number)
-  const cursor = new Date(iy, im - 1, id)
-  const finDate = new Date(fy, fm - 1, fd)
-  const out: string[] = []
-  let guard = 0
-  while (cursor <= finDate && guard < 3000) {
-    const weekday = (cursor.getDay() + 6) % 7
-    if (diasSet.has(weekday)) out.push(dateToIso(cursor))
-    cursor.setDate(cursor.getDate() + 1)
-    guard++
-  }
-  return out
-}
-
-function formatHora(hora: string | null): string {
-  if (!hora) return ''
-  const [hStr, mStr] = hora.split(':')
-  const h = Number(hStr)
-  const suffix = h >= 12 ? 'p.m.' : 'a.m.'
-  const h12 = h % 12 === 0 ? 12 : h % 12
-  return `${h12}:${mStr} ${suffix}`
-}
-
-function formatFechaSesion(fecha: string): string {
-  if (fecha === todayIso()) return 'Hoy'
-  if (fecha === addDays(todayIso(), 1)) return 'Mañana'
-  const [y, m, d] = fecha.split('-').map(Number)
-  const label = new Date(y, m - 1, d).toLocaleDateString('es-CO', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  })
-  return label.charAt(0).toUpperCase() + label.slice(1)
+type Avance = {
+  id: string
+  fecha: string
+  cursoId: string
+  lecciones: number
+  aprendizaje: string
 }
 
 type MiPanelProps = {
@@ -178,6 +101,31 @@ export default function MiPanel({ nombre, userId, onRegistrarAvance }: MiPanelPr
         }
       })
       setHorariosPorCurso(map)
+    })
+  }, [userId])
+
+  const [ultimosReportes, setUltimosReportes] = useState<Avance[]>([])
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'avances'),
+      where('userId', '==', userId),
+      orderBy('creadoEn', 'desc'),
+      limit(3),
+    )
+    return onSnapshot(q, (snap) => {
+      setUltimosReportes(
+        snap.docs.map((d) => {
+          const data = d.data()
+          return {
+            id: d.id,
+            fecha: (data.fecha as string) ?? '',
+            cursoId: (data.cursoId as string) ?? '',
+            lecciones: (data.lecciones as number) ?? 0,
+            aprendizaje: (data.aprendizaje as string) ?? '',
+          }
+        }),
+      )
     })
   }, [userId])
 
@@ -324,41 +272,39 @@ export default function MiPanel({ nombre, userId, onRegistrarAvance }: MiPanelPr
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-            Últimos reportes
-          </p>
-          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            Datos de demostración
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                <th className="pb-2 pr-4 font-semibold">Fecha</th>
-                <th className="pb-2 pr-4 font-semibold">Curso</th>
-                <th className="pb-2 pr-4 font-semibold">Lecciones</th>
-                <th className="pb-2 font-semibold">Aprendizaje</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {ultimosReportes.map((r, i) => (
-                <tr key={i}>
-                  <td className="py-2.5 pr-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                    {r.fecha}
-                  </td>
-                  <td className="py-2.5 pr-4 font-medium text-gray-900 dark:text-gray-100">
-                    {r.curso}
-                  </td>
-                  <td className="py-2.5 pr-4 text-gray-500 dark:text-gray-400">{r.lecciones}</td>
-                  <td className="py-2.5 text-gray-500 dark:text-gray-400">{r.aprendizaje}</td>
+        <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+          Últimos reportes
+        </p>
+        {ultimosReportes.length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Todavía no registraste ningún avance.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead>
+                <tr className="text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                  <th className="pb-2 pr-4 font-semibold">Fecha</th>
+                  <th className="pb-2 pr-4 font-semibold">Curso</th>
+                  <th className="pb-2 pr-4 font-semibold">Lecciones</th>
+                  <th className="pb-2 font-semibold">Aprendizaje</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {ultimosReportes.map((r) => (
+                  <tr key={r.id}>
+                    <td className="py-2.5 pr-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                      {formatFechaSesion(r.fecha)}
+                    </td>
+                    <td className="py-2.5 pr-4 font-medium text-gray-900 dark:text-gray-100">
+                      {cursosPorId[r.cursoId]?.nombre ?? r.cursoId}
+                    </td>
+                    <td className="py-2.5 pr-4 text-gray-500 dark:text-gray-400">{r.lecciones}</td>
+                    <td className="py-2.5 text-gray-500 dark:text-gray-400">{r.aprendizaje}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
