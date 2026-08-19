@@ -47,6 +47,7 @@ type Avance = {
 
 type Fila = {
   key: string
+  fecha: string
   colaborador: string
   sede: string | null
   curso: string
@@ -92,6 +93,15 @@ function horaAMin(hora: string): number {
   return h * 60 + m
 }
 
+function finDeAnioIso(): string {
+  return `${new Date().getFullYear()}-12-31`
+}
+
+function formatFechaCorta(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+}
+
 // Racha de cumplimiento no tiene una definición de dato real todavía (requeriría
 // historial agregado por colaborador); se deja como dato de prueba a propósito.
 const RACHA_PRUEBA_DIAS = 12
@@ -99,6 +109,7 @@ const RACHA_PRUEBA_DIAS = 12
 export default function Dashboard() {
   const [tab, setTab] = useState<Tab>('general')
   const [fecha, setFecha] = useState(todayIso())
+  const [verAnio, setVerAnio] = useState(false)
   const [sede, setSede] = useState('Todas')
   const [estado, setEstado] = useState('Todos')
 
@@ -200,45 +211,51 @@ export default function Dashboard() {
     return map
   }, [usuarios])
 
-  function filasDelDia(diaIso: string): Fila[] {
+  function filasEnRango(desdeIso: string, hastaIso: string): Fila[] {
     return inscripciones
-      .map((insc): Fila | null => {
+      .flatMap((insc): Fila[] => {
         const horario = horariosPorKey[horarioKey(insc.cursoId, insc.userId)]
-        if (!horario || !horario.hora) return null
-        if (ocurrenciasEntre(horario, diaIso, diaIso).length === 0) return null
+        if (!horario || !horario.hora) return []
+        const ocurrencias = ocurrenciasEntre(horario, desdeIso, hastaIso)
+        if (ocurrencias.length === 0) return []
 
         const user = usuariosPorId[insc.userId]
         const curso = cursosPorId[insc.cursoId]
-        if (!user || !curso) return null
+        if (!user || !curso) return []
 
-        const avance = avances
-          .filter((a) => a.userId === insc.userId && a.cursoId === insc.cursoId && a.fecha === diaIso)
-          .sort((a, b) => (b.creadoEn?.toMillis() ?? 0) - (a.creadoEn?.toMillis() ?? 0))[0]
+        return ocurrencias.map((diaIso): Fila => {
+          const avance = avances
+            .filter((a) => a.userId === insc.userId && a.cursoId === insc.cursoId && a.fecha === diaIso)
+            .sort((a, b) => (b.creadoEn?.toMillis() ?? 0) - (a.creadoEn?.toMillis() ?? 0))[0]
 
-        const estadoFila: Estado = avance ? 'Reportó' : diaIso < todayIso() ? 'No reportó' : 'Pendiente'
-        const reporteHora = avance?.creadoEn
-          ? avance.creadoEn.toDate().toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })
-          : null
+          const estadoFila: Estado = avance ? 'Reportó' : diaIso < todayIso() ? 'No reportó' : 'Pendiente'
+          const reporteHora = avance?.creadoEn
+            ? avance.creadoEn.toDate().toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })
+            : null
 
-        return {
-          key: horarioKey(insc.cursoId, insc.userId),
-          colaborador: user.nombre,
-          sede: user.sede,
-          curso: curso.nombre,
-          horaMin: horaAMin(horario.hora as string),
-          horario: formatHora(horario.hora),
-          duracionMin: horario.duracionMin ?? 60,
-          estado: estadoFila,
-          lecciones: avance?.lecciones ?? null,
-          aprendizaje: avance?.aprendizaje ?? null,
-          reporte: reporteHora,
-        }
+          return {
+            key: `${horarioKey(insc.cursoId, insc.userId)}_${diaIso}`,
+            fecha: diaIso,
+            colaborador: user.nombre,
+            sede: user.sede,
+            curso: curso.nombre,
+            horaMin: horaAMin(horario.hora as string),
+            horario: formatHora(horario.hora),
+            duracionMin: horario.duracionMin ?? 60,
+            estado: estadoFila,
+            lecciones: avance?.lecciones ?? null,
+            aprendizaje: avance?.aprendizaje ?? null,
+            reporte: reporteHora,
+          }
+        })
       })
-      .filter((f): f is Fila => f !== null)
-      .sort((a, b) => a.horaMin - b.horaMin)
+      .sort((a, b) => (a.fecha === b.fecha ? a.horaMin - b.horaMin : a.fecha.localeCompare(b.fecha)))
   }
 
-  const filasFecha = useMemo(() => filasDelDia(fecha), [fecha, inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances])
+  const filasFecha = useMemo(
+    () => (verAnio ? filasEnRango(todayIso(), finDeAnioIso()) : filasEnRango(fecha, fecha)),
+    [fecha, verAnio, inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances],
+  )
 
   const filtradas = filasFecha.filter((f) => {
     const matchSede = sede === 'Todas' || f.sede === sede
@@ -252,7 +269,10 @@ export default function Dashboard() {
   const noReportaron = filtradas.filter((f) => f.estado === 'No reportó').length
   const porcentaje = programadas > 0 ? Math.round((reportaron / programadas) * 100) : 0
 
-  const filasHoy = useMemo(() => filasDelDia(todayIso()), [inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances])
+  const filasHoy = useMemo(
+    () => filasEnRango(todayIso(), todayIso()),
+    [inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances],
+  )
 
   const ahoraMin = useMemo(() => {
     const n = new Date()
@@ -271,7 +291,11 @@ export default function Dashboard() {
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{formatFechaLarga(fecha)}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {tab === 'general' && verAnio
+              ? `Desde hoy hasta ${formatFechaCorta(finDeAnioIso())}`
+              : formatFechaLarga(fecha)}
+          </p>
         </div>
       </div>
 
@@ -335,28 +359,46 @@ export default function Dashboard() {
                   <input
                     type="date"
                     value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    min={todayIso()}
+                    disabled={verAnio}
+                    onChange={(e) => setFecha(e.target.value < todayIso() ? todayIso() : e.target.value)}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                   <div className="flex flex-col overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700">
                     <button
                       type="button"
                       title="Un día después"
+                      disabled={verAnio}
                       onClick={() => setFecha((f) => addDays(f, 1))}
-                      className="flex h-[19px] w-8 items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                      className="flex h-[19px] w-8 items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                     >
                       <ChevronUp className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
                       title="Un día antes"
-                      onClick={() => setFecha((f) => addDays(f, -1))}
-                      className="flex h-[19px] w-8 items-center justify-center border-t border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                      disabled={verAnio || fecha === todayIso()}
+                      onClick={() => setFecha((f) => (f === todayIso() ? f : addDays(f, -1)))}
+                      className="flex h-[19px] w-8 items-center justify-center border-t border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:text-gray-300 disabled:opacity-50 disabled:hover:bg-transparent dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400 dark:disabled:text-gray-700"
                     >
                       <ChevronDown className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
+              </div>
+              <div>
+                <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Rango
+                </span>
+                <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={verAnio}
+                    onChange={(e) => setVerAnio(e.target.checked)}
+                    className="h-4 w-4 accent-blue-600 dark:accent-indigo-500"
+                  />
+                  Ver todo el año
+                </label>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -392,6 +434,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={() => {
                   setFecha(todayIso())
+                  setVerAnio(false)
                   setSede('Todas')
                   setEstado('Todos')
                 }}
@@ -410,6 +453,7 @@ export default function Dashboard() {
                     <th className="px-5 py-3 font-semibold">Colaborador</th>
                     <th className="px-5 py-3 font-semibold">Sede</th>
                     <th className="px-5 py-3 font-semibold">Curso</th>
+                    {verAnio && <th className="px-5 py-3 font-semibold">Fecha</th>}
                     <th className="px-5 py-3 font-semibold">Horario</th>
                     <th className="px-5 py-3 font-semibold">Estado</th>
                     <th className="px-5 py-3 font-semibold">Lecciones</th>
@@ -420,14 +464,16 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
+                      <td colSpan={verAnio ? 9 : 8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
                         Cargando...
                       </td>
                     </tr>
                   ) : filtradas.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
-                        No hay sesiones programadas para esta fecha.
+                      <td colSpan={verAnio ? 9 : 8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
+                        {verAnio
+                          ? 'No hay sesiones programadas de hoy en adelante.'
+                          : 'No hay sesiones programadas para esta fecha.'}
                       </td>
                     </tr>
                   ) : (
@@ -438,6 +484,11 @@ export default function Dashboard() {
                         </td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.sede ?? '–'}</td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.curso}</td>
+                        {verAnio && (
+                          <td className="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                            {formatFechaCorta(f.fecha)}
+                          </td>
+                        )}
                         <td className="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {f.horario}
                         </td>
