@@ -11,6 +11,16 @@ export const diaIndex: Record<Dia, number> = {
   Domingo: 6,
 }
 
+export const diaCorto: Record<Dia, string> = {
+  Lunes: 'Lun',
+  Martes: 'Mar',
+  Miércoles: 'Mié',
+  Jueves: 'Jue',
+  Viernes: 'Vie',
+  Sábado: 'Sáb',
+  Domingo: 'Dom',
+}
+
 export type HorarioOcurrencias = {
   modo: Modo
   dias: Dia[]
@@ -66,6 +76,18 @@ export function formatHora(hora: string | null): string {
   const suffix = h >= 12 ? 'p.m.' : 'a.m.'
   const h12 = h % 12 === 0 ? 12 : h % 12
   return `${h12}:${mStr} ${suffix}`
+}
+
+export function inicioSemanaIso(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const dow = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - dow)
+  return dateToIso(date)
+}
+
+export function finSemanaIso(iso: string): string {
+  return addDays(inicioSemanaIso(iso), 6)
 }
 
 export function formatFechaSesion(fecha: string): string {
