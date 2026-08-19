@@ -266,8 +266,6 @@ export default function Dashboard() {
     filasHoy.find((f) => f.estado === 'Pendiente' && f.horaMin > ahoraMin) ?? null
   const completadasHoy = filasHoy.filter((f) => f.estado === 'Reportó').length
 
-  const enHoy = fecha === todayIso()
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -337,8 +335,7 @@ export default function Dashboard() {
                   <input
                     type="date"
                     value={fecha}
-                    min={todayIso()}
-                    onChange={(e) => setFecha(e.target.value < todayIso() ? todayIso() : e.target.value)}
+                    onChange={(e) => setFecha(e.target.value)}
                     className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                   <div className="flex flex-col overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700">
@@ -353,9 +350,8 @@ export default function Dashboard() {
                     <button
                       type="button"
                       title="Un día antes"
-                      disabled={enHoy}
-                      onClick={() => setFecha((f) => (f === todayIso() ? f : addDays(f, -1)))}
-                      className="flex h-[19px] w-8 items-center justify-center border-t border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400 dark:disabled:text-gray-700"
+                      onClick={() => setFecha((f) => addDays(f, -1))}
+                      className="flex h-[19px] w-8 items-center justify-center border-t border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                     >
                       <ChevronDown className="h-3.5 w-3.5" />
                     </button>
