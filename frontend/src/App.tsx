@@ -9,6 +9,7 @@ import Horarios from './Horarios'
 import InformeSemanal from './InformeSemanal'
 import Colaboradores from './Colaboradores'
 import ListadoCursos from './ListadoCursos'
+import Alertas from './Alertas'
 import ComingSoon from './ComingSoon'
 import { useTheme } from './useTheme'
 import { useAuth } from './useAuth'
@@ -56,6 +57,8 @@ function App() {
     content = <Colaboradores />
   } else if (activeView === 'listado-cursos') {
     content = <ListadoCursos />
+  } else if (activeView === 'alertas') {
+    content = <Alertas userId={firebaseUser.uid} />
   } else {
     content = <ComingSoon title={navLabels[activeView]} />
   }

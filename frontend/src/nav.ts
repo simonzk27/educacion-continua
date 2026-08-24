@@ -7,6 +7,7 @@ import {
   FileText,
   Users,
   BookOpen,
+  BellRing,
 } from 'lucide-react'
 
 export type ViewId =
@@ -17,6 +18,7 @@ export type ViewId =
   | 'informe-semanal'
   | 'colaboradores'
   | 'listado-cursos'
+  | 'alertas'
 
 export type NavItem = {
   id: ViewId
@@ -50,7 +52,10 @@ export const navSections: NavSection[] = [
   {
     title: 'Administración',
     adminOnly: true,
-    items: [{ id: 'colaboradores', label: 'Colaboradores', icon: Users }],
+    items: [
+      { id: 'colaboradores', label: 'Colaboradores', icon: Users },
+      { id: 'alertas', label: 'Alertas', icon: BellRing },
+    ],
   },
   {
     title: 'Cursos',
