@@ -1,0 +1,27 @@
+name: Enviar alertas de sesiones
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  enviar-alertas:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scripts/alertas-cron
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install --omit=dev
+
+      - run: node index.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERTAS_FROM_EMAIL: ${{ secrets.ALERTAS_FROM_EMAIL }}
