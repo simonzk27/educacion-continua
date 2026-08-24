@@ -1,10 +1,23 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Plus, Pencil, UserPlus, X, CheckCircle2, Search, ChevronLeft, ChevronRight, Check } from 'lucide-react'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  UserPlus,
+  X,
+  CheckCircle2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  TriangleAlert,
+} from 'lucide-react'
 import {
   collection,
   addDoc,
   deleteDoc,
   doc,
+  getDocs,
   setDoc,
   updateDoc,
   onSnapshot,
@@ -12,6 +25,8 @@ import {
   query,
   increment,
   serverTimestamp,
+  where,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
 
@@ -85,6 +100,9 @@ export default function ListadoCursos() {
   const [search, setSearch] = useState('')
   const [rolFiltro, setRolFiltro] = useState<RolFiltro>('Todos')
   const [page, setPage] = useState(1)
+
+  const [deleting, setDeleting] = useState<Curso | null>(null)
+  const [deletingBusy, setDeletingBusy] = useState(false)
 
   useEffect(() => {
     const q = query(collection(db, 'cursos'), orderBy('nombre'))
@@ -263,6 +281,32 @@ export default function ListadoCursos() {
     }
   }
 
+  async function handleDeleteConfirm() {
+    if (!deleting) return
+    setDeletingBusy(true)
+    try {
+      const cursoId = deleting.id
+      const [inscSnap, horSnap, avSnap] = await Promise.all([
+        getDocs(collection(db, 'cursos', cursoId, 'inscripciones')),
+        getDocs(query(collection(db, 'horarios'), where('cursoId', '==', cursoId))),
+        getDocs(query(collection(db, 'avances'), where('cursoId', '==', cursoId))),
+      ])
+      const batch = writeBatch(db)
+      inscSnap.forEach((d) => batch.delete(d.ref))
+      horSnap.forEach((d) => batch.delete(d.ref))
+      avSnap.forEach((d) => batch.delete(d.ref))
+      batch.delete(doc(db, 'cursos', cursoId))
+      await batch.commit()
+
+      setToast(`${deleting.nombre} eliminado permanentemente.`)
+      setDeleting(null)
+    } catch {
+      setToast(null)
+    } finally {
+      setDeletingBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -365,6 +409,14 @@ export default function ListadoCursos() {
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                         >
                           <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleting(c)}
+                          title="Eliminar curso"
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
@@ -654,6 +706,47 @@ export default function ListadoCursos() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {deleting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                <TriangleAlert className="h-5.5 w-5.5" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  ¿Eliminar {deleting.nombre}?
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Esta acción no se puede deshacer. Se eliminará permanentemente el curso y todos
+                  sus datos asociados: inscripciones, horarios y avances reportados
+                  {deleting.inscritos > 0 ? ` (${deleting.inscritos} colaborador${deleting.inscritos === 1 ? '' : 'es'} inscrito${deleting.inscritos === 1 ? '' : 's'})` : ''}.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleting(null)}
+                disabled={deletingBusy}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={deletingBusy}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+              >
+                {deletingBusy ? 'Eliminando...' : 'Sí, eliminar por completo'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Pencil, X, CheckCircle2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert } from 'lucide-react'
 import { createUserWithEmailAndPassword, signOut as secondarySignOut, type AuthError } from 'firebase/auth'
 import {
   collection,
   collectionGroup,
   doc,
+  getDocs,
+  increment,
   setDoc,
   updateDoc,
   onSnapshot,
   orderBy,
   query,
+  where,
+  writeBatch,
 } from 'firebase/firestore'
 import { db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
 
@@ -64,6 +68,8 @@ export default function Colaboradores() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<Colaborador | null>(null)
+  const [deletingBusy, setDeletingBusy] = useState(false)
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('nombre'))
@@ -211,6 +217,38 @@ export default function Colaboradores() {
     }
   }
 
+  async function handleDeleteConfirm() {
+    if (!deleting) return
+    setDeletingBusy(true)
+    try {
+      const uid = deleting.id
+      const cursoIds = inscripciones.filter((i) => i.userId === uid).map((i) => i.cursoId)
+
+      const batch = writeBatch(db)
+      cursoIds.forEach((cursoId) => {
+        batch.delete(doc(db, 'cursos', cursoId, 'inscripciones', uid))
+        batch.delete(doc(db, 'horarios', `${cursoId}_${uid}`))
+        batch.update(doc(db, 'cursos', cursoId), { inscritos: increment(-1) })
+      })
+      batch.delete(doc(db, 'users', uid))
+      await batch.commit()
+
+      const avancesSnap = await getDocs(query(collection(db, 'avances'), where('userId', '==', uid)))
+      if (!avancesSnap.empty) {
+        const batch2 = writeBatch(db)
+        avancesSnap.forEach((d) => batch2.delete(d.ref))
+        await batch2.commit()
+      }
+
+      setToast(`${deleting.nombre} eliminado permanentemente.`)
+      setDeleting(null)
+    } catch {
+      setToast(null)
+    } finally {
+      setDeletingBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -281,14 +319,24 @@ export default function Colaboradores() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(c)}
-                          title="Editar colaborador"
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(c)}
+                            title="Editar colaborador"
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleting(c)}
+                            title="Eliminar colaborador"
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -435,6 +483,46 @@ export default function Colaboradores() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                <TriangleAlert className="h-5.5 w-5.5" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  ¿Eliminar a {deleting.nombre}?
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Esta acción no se puede deshacer. Se eliminará permanentemente el colaborador y
+                  todos sus datos asociados: inscripciones, horarios y avances reportados.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleting(null)}
+                disabled={deletingBusy}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={deletingBusy}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+              >
+                {deletingBusy ? 'Eliminando...' : 'Sí, eliminar por completo'}
+              </button>
+            </div>
           </div>
         </div>
       )}
