@@ -1,0 +1,13 @@
+{
+  "name": "migrate-tipo-curso",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-off migration: renombra el tipo de curso 'Natural' a 'Educación Continua'.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

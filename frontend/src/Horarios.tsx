@@ -3,7 +3,7 @@ import { Settings2, X, CheckCircle2, CalendarClock, Clock, Timer, CalendarRange 
 import { collection, collectionGroup, doc, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
 
-type Sede = 'Colombia' | 'USA' | 'CMC Entrenamiento'
+type Equipo = 'Educación Continua' | 'Unimetab' | 'Academia'
 type Estado = 'Activo' | 'Inactivo'
 type Dia = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo'
 
@@ -22,7 +22,7 @@ const diaCorto: Record<Dia, string> = {
 type Usuario = {
   id: string
   nombre: string
-  sede: Sede | null
+  equipo: Equipo | null
   activo: boolean
 }
 
@@ -54,7 +54,7 @@ type Fila = {
   userId: string
   cursoId: string
   colaborador: string
-  sede: Sede | null
+  equipo: Equipo | null
   activo: boolean
   curso: string
   modo: Modo
@@ -145,7 +145,7 @@ export default function Horarios() {
   const [loadingInscripciones, setLoadingInscripciones] = useState(true)
   const [loadingHorarios, setLoadingHorarios] = useState(true)
 
-  const [sede, setSede] = useState('Todas')
+  const [equipo, setEquipo] = useState('Todas')
   const [colaborador, setColaborador] = useState('Todos')
   const [curso, setCurso] = useState('Todos')
   const [estado, setEstado] = useState('Todos')
@@ -168,7 +168,7 @@ export default function Horarios() {
             return {
               id: d.id,
               nombre: data.nombre ?? '',
-              sede: (data.sede as Sede) ?? null,
+              equipo: (data.equipo as Equipo) ?? null,
               activo: data.activo !== false,
             }
           }),
@@ -283,7 +283,7 @@ export default function Horarios() {
           userId: insc.userId,
           cursoId: insc.cursoId,
           colaborador: u.nombre,
-          sede: u.sede,
+          equipo: u.equipo,
           activo: u.activo,
           curso: cursoNombres[insc.cursoId] ?? insc.cursoId,
           modo: h?.modo ?? 'semanal',
@@ -306,12 +306,12 @@ export default function Horarios() {
   const cursosOpciones = useMemo(() => [...new Set(filas.map((f) => f.curso))].sort(), [filas])
 
   const filtradas = filas.filter((f) => {
-    const matchSede = sede === 'Todas' || f.sede === sede
+    const matchEquipo = equipo === 'Todas' || f.equipo === equipo
     const matchColaborador = colaborador === 'Todos' || f.colaborador === colaborador
     const matchCurso = curso === 'Todos' || f.curso === curso
     const estadoFila: Estado = f.activo ? 'Activo' : 'Inactivo'
     const matchEstado = estado === 'Todos' || estadoFila === estado
-    return matchSede && matchColaborador && matchCurso && matchEstado
+    return matchEquipo && matchColaborador && matchCurso && matchEstado
   })
 
   function openEditModal(f: Fila) {
@@ -416,17 +416,17 @@ export default function Horarios() {
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-              Sede
+              Equipo / Línea de negocio
             </label>
             <select
-              value={sede}
-              onChange={(e) => setSede(e.target.value)}
+              value={equipo}
+              onChange={(e) => setEquipo(e.target.value)}
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
             >
               <option>Todas</option>
-              <option>Colombia</option>
-              <option>USA</option>
-              <option>CMC Entrenamiento</option>
+              <option>Educación Continua</option>
+              <option>Unimetab</option>
+              <option>Academia</option>
             </select>
           </div>
           <div>
@@ -482,7 +482,7 @@ export default function Horarios() {
             <thead>
               <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
                 <th className="px-5 py-3 font-semibold">Colaborador</th>
-                <th className="px-5 py-3 font-semibold">Sede</th>
+                <th className="px-5 py-3 font-semibold">Equipo</th>
                 <th className="px-5 py-3 font-semibold">Curso</th>
                 <th className="px-5 py-3 font-semibold">Días</th>
                 <th className="px-5 py-3 font-semibold">Hora</th>
@@ -513,7 +513,7 @@ export default function Horarios() {
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
                         {f.colaborador}
                       </td>
-                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.sede ?? '–'}</td>
+                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo ?? '–'}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.curso}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
                         {f.modo === 'mensual' && f.fechas.length > 0

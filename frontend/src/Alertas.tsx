@@ -78,10 +78,11 @@ export default function Alertas({ userId }: AlertasProps) {
       <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 dark:border-amber-500/30 dark:bg-amber-500/10">
         <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
         <p className="text-sm text-amber-800 dark:text-amber-300">
-          Esta pantalla guarda la configuración. El envío corre por un job programado (GitHub
-          Actions) fuera de esta app — revisá cada sesión y manda el correo por Resend. Falta
-          configurar las credenciales una sola vez (ver <code>scripts/alertas-cron/README.md</code>)
-          para que empiece a mandar de verdad.
+          Esta pantalla sirve para decidir con cuánto tiempo de anticipación se le avisa a cada
+          colaborador, por correo, que tiene una sesión próxima. Guardá acá la configuración que
+          quieras. <strong>Importante:</strong> todavía falta un paso técnico único (hecho por quien
+          administra el sistema) para que esos correos empiecen a enviarse de verdad — mientras
+          tanto, esta pantalla guarda tus preferencias pero no se manda ningún correo.
         </p>
       </div>
 

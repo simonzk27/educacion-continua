@@ -1,0 +1,13 @@
+{
+  "name": "migrate-equipo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-off migration: renombra el campo 'sede' de los colaboradores a 'equipo' y remapea sus valores.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

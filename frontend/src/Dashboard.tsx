@@ -10,7 +10,7 @@ type Tab = 'general' | 'diario'
 type Usuario = {
   id: string
   nombre: string
-  sede: string | null
+  equipo: string | null
   activo: boolean
 }
 
@@ -49,7 +49,7 @@ type Fila = {
   key: string
   fecha: string
   colaborador: string
-  sede: string | null
+  equipo: string | null
   curso: string
   horaMin: number
   horario: string
@@ -110,7 +110,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState<Tab>('general')
   const [fecha, setFecha] = useState(todayIso())
   const [verAnio, setVerAnio] = useState(false)
-  const [sede, setSede] = useState('Todas')
+  const [equipo, setEquipo] = useState('Todas')
   const [estado, setEstado] = useState('Todos')
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -128,7 +128,7 @@ export default function Dashboard() {
           return {
             id: d.id,
             nombre: (data.nombre as string) ?? '',
-            sede: (data.sede as string) ?? null,
+            equipo: (data.equipo as string) ?? null,
             activo: data.activo !== false,
           }
         }),
@@ -237,7 +237,7 @@ export default function Dashboard() {
             key: `${horarioKey(insc.cursoId, insc.userId)}_${diaIso}`,
             fecha: diaIso,
             colaborador: user.nombre,
-            sede: user.sede,
+            equipo: user.equipo,
             curso: curso.nombre,
             horaMin: horaAMin(horario.hora as string),
             horario: formatHora(horario.hora),
@@ -258,9 +258,9 @@ export default function Dashboard() {
   )
 
   const filtradas = filasFecha.filter((f) => {
-    const matchSede = sede === 'Todas' || f.sede === sede
+    const matchEquipo = equipo === 'Todas' || f.equipo === equipo
     const matchEstado = estado === 'Todos' || f.estado === estado
-    return matchSede && matchEstado
+    return matchEquipo && matchEstado
   })
 
   const programadas = filtradas.length
@@ -402,17 +402,17 @@ export default function Dashboard() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Sede
+                  Equipo / Línea de negocio
                 </label>
                 <select
-                  value={sede}
-                  onChange={(e) => setSede(e.target.value)}
+                  value={equipo}
+                  onChange={(e) => setEquipo(e.target.value)}
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 >
                   <option>Todas</option>
-                  <option>Colombia</option>
-                  <option>USA</option>
-                  <option>CMC Entrenamiento</option>
+                  <option>Educación Continua</option>
+                  <option>Unimetab</option>
+                  <option>Academia</option>
                 </select>
               </div>
               <div>
@@ -435,7 +435,7 @@ export default function Dashboard() {
                 onClick={() => {
                   setFecha(todayIso())
                   setVerAnio(false)
-                  setSede('Todas')
+                  setEquipo('Todas')
                   setEstado('Todos')
                 }}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -451,7 +451,7 @@ export default function Dashboard() {
                 <thead>
                   <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
                     <th className="px-5 py-3 font-semibold">Colaborador</th>
-                    <th className="px-5 py-3 font-semibold">Sede</th>
+                    <th className="px-5 py-3 font-semibold">Equipo</th>
                     <th className="px-5 py-3 font-semibold">Curso</th>
                     {verAnio && <th className="px-5 py-3 font-semibold">Fecha</th>}
                     <th className="px-5 py-3 font-semibold">Horario</th>
@@ -482,7 +482,7 @@ export default function Dashboard() {
                         <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
                           {f.colaborador}
                         </td>
-                        <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.sede ?? '–'}</td>
+                        <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo ?? '–'}</td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.curso}</td>
                         {verAnio && (
                           <td className="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
@@ -590,7 +590,7 @@ export default function Dashboard() {
                             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                               {f.colaborador}{' '}
                               <span className="font-normal text-gray-400 dark:text-gray-500">
-                                · {f.sede ?? '–'}
+                                · {f.equipo ?? '–'}
                               </span>
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">{f.curso}</p>

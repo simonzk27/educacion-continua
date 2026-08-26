@@ -17,7 +17,7 @@ import {
 type Usuario = {
   id: string
   nombre: string
-  sede: string | null
+  equipo: string | null
   activo: boolean
 }
 
@@ -57,7 +57,7 @@ function horarioKey(cursoId: string, userId: string): string {
   return `${cursoId}_${userId}`
 }
 
-const sedes = ['Colombia', 'USA', 'CMC Entrenamiento']
+const equipos = ['Educación Continua', 'Unimetab', 'Academia']
 
 function cumplimientoStyle(pct: number) {
   if (pct >= 100) return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
@@ -107,7 +107,7 @@ type FilaStaff = {
 type FilaCumplimiento = {
   colaboradorId: string
   colaborador: string
-  sede: string
+  equipo: string
   programadas: number
   realizados: number
   sinReporte: number
@@ -131,7 +131,7 @@ export default function InformeSemanal() {
           return {
             id: d.id,
             nombre: (data.nombre as string) ?? '',
-            sede: (data.sede as string) ?? null,
+            equipo: (data.equipo as string) ?? null,
             activo: data.activo !== false,
           }
         }),
@@ -265,9 +265,9 @@ export default function InformeSemanal() {
         cursoInfos[0]
       const cursoASeguir = cursoInfos.find((c) => c.cursoId !== cursoActual.cursoId && c.progreso === 0) ?? null
 
-      const sedeKey = user.sede ?? 'Sin sede'
-      gruposMap[sedeKey] = [
-        ...(gruposMap[sedeKey] ?? []),
+      const equipoKey = user.equipo ?? 'Sin equipo'
+      gruposMap[equipoKey] = [
+        ...(gruposMap[equipoKey] ?? []),
         {
           colaboradorId: user.id,
           colaborador: user.nombre,
@@ -286,7 +286,7 @@ export default function InformeSemanal() {
         filasCumplimiento.push({
           colaboradorId: user.id,
           colaborador: user.nombre,
-          sede: user.sede ?? '—',
+          equipo: user.equipo ?? '—',
           programadas,
           realizados,
           sinReporte: Math.max(0, programadas - realizados),
@@ -294,7 +294,7 @@ export default function InformeSemanal() {
       }
     })
 
-    const gruposOrdenados = [...sedes, ...Object.keys(gruposMap).filter((s) => !sedes.includes(s))]
+    const gruposOrdenados = [...equipos, ...Object.keys(gruposMap).filter((s) => !equipos.includes(s))]
       .filter((s) => gruposMap[s]?.length)
       .map((s) => ({ titulo: s, filas: gruposMap[s] }))
 
@@ -318,7 +318,7 @@ export default function InformeSemanal() {
       ]),
     )
     const encabezado = [
-      'Sede',
+      'Equipo',
       'Colaborador',
       'Curso actual',
       'Curso a seguir',
@@ -484,7 +484,7 @@ export default function InformeSemanal() {
               <thead>
                 <tr className="border-y border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
                   <th className="px-5 py-2.5 font-semibold">Colaborador</th>
-                  <th className="px-5 py-2.5 font-semibold">Sede</th>
+                  <th className="px-5 py-2.5 font-semibold">Equipo</th>
                   <th className="px-5 py-2.5 font-semibold">Sesiones programadas</th>
                   <th className="px-5 py-2.5 font-semibold">Reportes realizados</th>
                   <th className="px-5 py-2.5 font-semibold">Sin reporte</th>
@@ -499,7 +499,7 @@ export default function InformeSemanal() {
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
                         {f.colaborador}
                       </td>
-                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.sede}</td>
+                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo}</td>
                       <td className="px-5 py-3 text-gray-900 dark:text-gray-100">{f.programadas}</td>
                       <td className="px-5 py-3 font-medium text-blue-600 dark:text-indigo-400">
                         {f.realizados}

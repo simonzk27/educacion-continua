@@ -57,7 +57,7 @@ function App() {
   } else if (activeView === 'colaboradores') {
     content = <Colaboradores />
   } else if (activeView === 'listado-cursos') {
-    content = <ListadoCursos />
+    content = <ListadoCursos isAdmin={role === 'Admin'} />
   } else if (activeView === 'alertas') {
     content = <Alertas userId={firebaseUser.uid} />
   } else {
