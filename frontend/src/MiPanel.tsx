@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { collection, collectionGroup, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore'
-import { db } from './firebase'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { collection, collectionGroup, limit, onSnapshot, orderBy, query, where, doc, updateDoc } from 'firebase/firestore'
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  type AuthError,
+} from 'firebase/auth'
+import { auth, db } from './firebase'
 import {
   type Dia,
   type Modo,
@@ -39,11 +45,66 @@ type Avance = {
 type MiPanelProps = {
   readonly nombre: string | null
   readonly userId: string
+  readonly puedeCambiarPassword: boolean
   readonly onRegistrarAvance: () => void
 }
 
-export default function MiPanel({ nombre, userId, onRegistrarAvance }: MiPanelProps) {
+const passwordErrorMessages: Record<string, string> = {
+  'auth/wrong-password': 'Contraseña actual incorrecta.',
+  'auth/invalid-credential': 'Contraseña actual incorrecta.',
+  'auth/weak-password': 'La nueva contraseña debe tener al menos 8 caracteres y un número.',
+  'auth/requires-recent-login': 'Sesión muy antigua. Cerrá sesión y volvé a entrar antes de cambiarla.',
+}
+
+export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegistrarAvance }: MiPanelProps) {
   const primerNombre = nombre?.split(' ')[0] ?? 'Usuario'
+
+  const [pwActual, setPwActual] = useState('')
+  const [pwNueva, setPwNueva] = useState('')
+  const [pwConfirmar, setPwConfirmar] = useState('')
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [pwSubmitting, setPwSubmitting] = useState(false)
+  const [pwExito, setPwExito] = useState(false)
+
+  async function handleCambiarPassword(e: FormEvent) {
+    e.preventDefault()
+    setPwError(null)
+
+    if (pwNueva.length < 8 || !/\d/.test(pwNueva)) {
+      setPwError('La nueva contraseña debe tener al menos 8 caracteres y un número.')
+      return
+    }
+    if (pwNueva !== pwConfirmar) {
+      setPwError('Las contraseñas no coinciden.')
+      return
+    }
+
+    const firebaseUser = auth.currentUser
+    if (!firebaseUser?.email) return
+
+    setPwSubmitting(true)
+    try {
+      const credential = EmailAuthProvider.credential(firebaseUser.email, pwActual)
+      await reauthenticateWithCredential(firebaseUser, credential)
+      await updatePassword(firebaseUser, pwNueva)
+
+      try {
+        await updateDoc(doc(db, 'users', userId), { puedeCambiarPassword: false })
+      } catch {
+        // ya cambió la contraseña; que el admin la deshabilite manualmente si esto falla
+      }
+
+      setPwExito(true)
+      setPwActual('')
+      setPwNueva('')
+      setPwConfirmar('')
+    } catch (err) {
+      const code = (err as AuthError).code
+      setPwError((code && passwordErrorMessages[code]) ?? 'No se pudo cambiar la contraseña. Intentá de nuevo.')
+    } finally {
+      setPwSubmitting(false)
+    }
+  }
 
   const [cursosPorId, setCursosPorId] = useState<Record<string, Curso>>({})
   const [cursoIds, setCursoIds] = useState<string[]>([])
@@ -306,6 +367,67 @@ export default function MiPanel({ nombre, userId, onRegistrarAvance }: MiPanelPr
           </div>
         )}
       </div>
+
+      {puedeCambiarPassword && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+          <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+            Cambiar contraseña
+          </p>
+          {pwExito ? (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">
+              Contraseña actualizada correctamente.
+            </p>
+          ) : (
+            <form onSubmit={handleCambiarPassword} className="flex max-w-sm flex-col gap-3">
+              <div>
+                <label htmlFor="pwActual" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Contraseña actual
+                </label>
+                <input
+                  id="pwActual"
+                  type="password"
+                  value={pwActual}
+                  onChange={(e) => setPwActual(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label htmlFor="pwNueva" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Nueva contraseña
+                </label>
+                <input
+                  id="pwNueva"
+                  type="password"
+                  value={pwNueva}
+                  onChange={(e) => setPwNueva(e.target.value)}
+                  placeholder="Mínimo 8 caracteres y un número"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label htmlFor="pwConfirmar" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Confirmar nueva contraseña
+                </label>
+                <input
+                  id="pwConfirmar"
+                  type="password"
+                  value={pwConfirmar}
+                  onChange={(e) => setPwConfirmar(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                />
+              </div>
+              {pwError && <p className="text-sm text-red-600 dark:text-red-400">{pwError}</p>}
+              <button
+                type="submit"
+                disabled={pwSubmitting}
+                className="mt-1 w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              >
+                {pwSubmitting ? 'Guardando...' : 'Cambiar contraseña'}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   )
 }

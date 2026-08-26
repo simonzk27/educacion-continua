@@ -9,6 +9,7 @@ type AuthState = {
   firebaseUser: FirebaseUser | null
   role: Role | null
   nombre: string | null
+  puedeCambiarPassword: boolean
   loading: boolean
   blockedMessage: string | null
 }
@@ -23,6 +24,7 @@ export function useAuth(): AuthState {
     firebaseUser: null,
     role: null,
     nombre: null,
+    puedeCambiarPassword: false,
     loading: true,
     blockedMessage: null,
   })
@@ -34,6 +36,7 @@ export function useAuth(): AuthState {
           firebaseUser: null,
           role: null,
           nombre: null,
+          puedeCambiarPassword: false,
           loading: false,
           blockedMessage: prev.blockedMessage,
         }))
@@ -50,6 +53,7 @@ export function useAuth(): AuthState {
           firebaseUser: null,
           role: null,
           nombre: null,
+          puedeCambiarPassword: false,
           loading: false,
           blockedMessage: 'Tu cuenta está inactiva. Contactá al administrador.',
         })
@@ -59,7 +63,8 @@ export function useAuth(): AuthState {
       const rawRole = data?.rol as string
       const role = roleMap[rawRole] ?? null
       const nombre = (data?.nombre as string) || firebaseUser.email
-      setState({ firebaseUser, role, nombre, loading: false, blockedMessage: null })
+      const puedeCambiarPassword = data?.puedeCambiarPassword === true
+      setState({ firebaseUser, role, nombre, puedeCambiarPassword, loading: false, blockedMessage: null })
     })
   }, [])
 

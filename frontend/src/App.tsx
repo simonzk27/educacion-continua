@@ -17,7 +17,7 @@ import { auth } from './firebase'
 import { navLabels, type ViewId } from './nav'
 
 function App() {
-  const { firebaseUser, role, nombre, loading, blockedMessage } = useAuth()
+  const { firebaseUser, role, nombre, puedeCambiarPassword, loading, blockedMessage } = useAuth()
   const [activeView, setActiveView] = useState<ViewId>('mi-panel')
   const [collapsed, setCollapsed] = useState(false)
   const { theme, toggleTheme } = useTheme()
@@ -42,6 +42,7 @@ function App() {
       <MiPanel
         nombre={nombre}
         userId={firebaseUser.uid}
+        puedeCambiarPassword={puedeCambiarPassword}
         onRegistrarAvance={() => setActiveView('registrar-avance')}
       />
     )

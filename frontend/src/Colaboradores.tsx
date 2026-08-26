@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert } from 'lucide-react'
-import { createUserWithEmailAndPassword, signOut as secondarySignOut, type AuthError } from 'firebase/auth'
+import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert, KeyRound, Lock, LockOpen } from 'lucide-react'
+import {
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut as secondarySignOut,
+  type AuthError,
+} from 'firebase/auth'
 import {
   collection,
   collectionGroup,
@@ -15,7 +20,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
-import { db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
+import { auth, db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
 
 type Rol = 'Admin' | 'Usuario'
 type Estado = 'Activo' | 'Inactivo'
@@ -28,6 +33,7 @@ type Colaborador = {
   rol: Rol
   sede: Sede | null
   activo: boolean
+  puedeCambiarPassword: boolean
 }
 
 const rolToFirestore: Record<Rol, string> = { Admin: 'admin', Usuario: 'usuario' }
@@ -45,7 +51,7 @@ const estadoStyles: Record<Estado, string> = {
 const createErrorMessages: Record<string, string> = {
   'auth/email-already-in-use': 'Ese correo ya tiene una cuenta.',
   'auth/invalid-email': 'Correo inválido.',
-  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
+  'auth/weak-password': 'La contraseña debe tener al menos 8 caracteres y un número.',
 }
 
 const emptyForm = {
@@ -70,6 +76,9 @@ export default function Colaboradores() {
   const [toast, setToast] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<Colaborador | null>(null)
   const [deletingBusy, setDeletingBusy] = useState(false)
+  const [resetting, setResetting] = useState<Colaborador | null>(null)
+  const [resettingBusy, setResettingBusy] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('nombre'))
@@ -84,6 +93,7 @@ export default function Colaboradores() {
             rol: firestoreToRol[data.rol] ?? 'Usuario',
             sede: (data.sede as Sede) ?? null,
             activo: data.activo !== false,
+            puedeCambiarPassword: data.puedeCambiarPassword === true,
           }
         }),
       )
@@ -162,17 +172,19 @@ export default function Colaboradores() {
     e.preventDefault()
     setFormError(null)
 
+    const passwordValida = form.password.length >= 8 && /\d/.test(form.password)
+
     if (
       !form.nombre.trim() ||
       !form.email.trim() ||
-      (!editingId && form.password.length < 6) ||
+      (!editingId && !passwordValida) ||
       !form.rol ||
       !form.sede ||
       !form.estado
     ) {
       setFormError(
-        !editingId && form.password.length > 0 && form.password.length < 6
-          ? 'La contraseña debe tener al menos 6 caracteres.'
+        !editingId && form.password.length > 0 && !passwordValida
+          ? 'La contraseña debe tener al menos 8 caracteres y un número.'
           : 'Completá todos los campos.',
       )
       return
@@ -249,6 +261,36 @@ export default function Colaboradores() {
     }
   }
 
+  async function handleResetConfirm() {
+    if (!resetting) return
+    setResettingBusy(true)
+    try {
+      await sendPasswordResetEmail(auth, resetting.email)
+      setToast(`Correo de restablecimiento enviado a ${resetting.email}.`)
+      setResetting(null)
+    } catch {
+      setToast('No se pudo enviar el correo de restablecimiento.')
+    } finally {
+      setResettingBusy(false)
+    }
+  }
+
+  async function handleTogglePuedeCambiarPassword(c: Colaborador) {
+    setTogglingId(c.id)
+    try {
+      await updateDoc(doc(db, 'users', c.id), { puedeCambiarPassword: !c.puedeCambiarPassword })
+      setToast(
+        !c.puedeCambiarPassword
+          ? `${c.nombre} ahora puede cambiar su propia contraseña.`
+          : `Se deshabilitó el cambio de contraseña para ${c.nombre}.`,
+      )
+    } catch {
+      setToast('No se pudo actualizar el permiso.')
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
@@ -320,6 +362,35 @@ export default function Colaboradores() {
                       </td>
                       <td className="px-5 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setResetting(c)}
+                            title="Enviar restablecimiento de contraseña"
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePuedeCambiarPassword(c)}
+                            disabled={togglingId === c.id}
+                            title={
+                              c.puedeCambiarPassword
+                                ? 'Deshabilitar cambio de contraseña propio'
+                                : 'Habilitar cambio de contraseña propio'
+                            }
+                            className={`rounded-lg p-1.5 disabled:opacity-60 ${
+                              c.puedeCambiarPassword
+                                ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
+                                : 'text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400'
+                            }`}
+                          >
+                            {c.puedeCambiarPassword ? (
+                              <LockOpen className="h-4 w-4" />
+                            ) : (
+                              <Lock className="h-4 w-4" />
+                            )}
+                          </button>
                           <button
                             type="button"
                             onClick={() => openEditModal(c)}
@@ -401,7 +472,7 @@ export default function Colaboradores() {
                     type="password"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Mínimo 8 caracteres y un número"
                     className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                 </div>
@@ -521,6 +592,46 @@ export default function Colaboradores() {
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
               >
                 {deletingBusy ? 'Eliminando...' : 'Sí, eliminar por completo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                <KeyRound className="h-5.5 w-5.5" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  ¿Enviar restablecimiento a {resetting.nombre}?
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Se enviará un correo a <strong>{resetting.email}</strong> con un enlace para que
+                  defina una nueva contraseña.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setResetting(null)}
+                disabled={resettingBusy}
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleResetConfirm}
+                disabled={resettingBusy}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              >
+                {resettingBusy ? 'Enviando...' : 'Sí, enviar correo'}
               </button>
             </div>
           </div>
