@@ -48,6 +48,7 @@ type Avance = {
 type Fila = {
   key: string
   fecha: string
+  userId: string
   colaborador: string
   equipo: string | null
   curso: string
@@ -211,6 +212,14 @@ export default function Dashboard() {
     return map
   }, [usuarios])
 
+  const cantidadCursosPorUsuario = useMemo(() => {
+    const map: Record<string, number> = {}
+    inscripciones.forEach((insc) => {
+      map[insc.userId] = (map[insc.userId] ?? 0) + 1
+    })
+    return map
+  }, [inscripciones])
+
   function filasEnRango(desdeIso: string, hastaIso: string): Fila[] {
     return inscripciones
       .flatMap((insc): Fila[] => {
@@ -236,6 +245,7 @@ export default function Dashboard() {
           return {
             key: `${horarioKey(insc.cursoId, insc.userId)}_${diaIso}`,
             fecha: diaIso,
+            userId: insc.userId,
             colaborador: user.nombre,
             equipo: user.equipo,
             curso: curso.nombre,
@@ -480,7 +490,17 @@ export default function Dashboard() {
                     filtradas.map((f) => (
                       <tr key={f.key}>
                         <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                          {f.colaborador}
+                          <span className="inline-flex items-center gap-1.5">
+                            {f.colaborador}
+                            {(cantidadCursosPorUsuario[f.userId] ?? 0) > 1 && (
+                              <span
+                                title={`${cantidadCursosPorUsuario[f.userId]} cursos asociados`}
+                                className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                              >
+                                {cantidadCursosPorUsuario[f.userId]} cursos
+                              </span>
+                            )}
+                          </span>
                         </td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo ?? '–'}</td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.curso}</td>
@@ -589,6 +609,14 @@ export default function Dashboard() {
                           <div>
                             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                               {f.colaborador}{' '}
+                              {(cantidadCursosPorUsuario[f.userId] ?? 0) > 1 && (
+                                <span
+                                  title={`${cantidadCursosPorUsuario[f.userId]} cursos asociados`}
+                                  className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                                >
+                                  {cantidadCursosPorUsuario[f.userId]} cursos
+                                </span>
+                              )}{' '}
                               <span className="font-normal text-gray-400 dark:text-gray-500">
                                 · {f.equipo ?? '–'}
                               </span>

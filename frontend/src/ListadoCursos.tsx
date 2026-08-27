@@ -97,6 +97,7 @@ type InscripcionTablero = {
   userId: string
   cursoId: string
   completado: boolean
+  confirmado: boolean
   fechaCompletado: Timestamp | null
 }
 
@@ -190,6 +191,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
               userId,
               cursoId,
               completado: data.completado === true,
+              confirmado: data.confirmado !== false,
               fechaCompletado: (data.fechaCompletado as Timestamp | undefined) ?? null,
             }
           })
@@ -219,13 +221,13 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
     progresoPorClave.set(key, (progresoPorClave.get(key) ?? 0) + a.lecciones)
   })
 
-  async function handleToggleCompletado(userId: string, cursoId: string, completadoActual: boolean) {
+  async function handleConfirmarCompletado(userId: string, cursoId: string) {
     const key = `${cursoId}_${userId}`
     setTogglingKey(key)
     try {
       await updateDoc(doc(db, 'cursos', cursoId, 'inscripciones', userId), {
-        completado: !completadoActual,
-        fechaCompletado: completadoActual ? null : serverTimestamp(),
+        confirmado: true,
+        fechaCompletado: serverTimestamp(),
       })
     } catch {
       setToast(null)
@@ -285,7 +287,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
   function estadoPersonaCurso(personaId: string, cursoId: string): 'Completado' | 'Pendiente' | 'No inscrito' {
     const insc = inscripcionesPorClave.get(`${cursoId}_${personaId}`)
     if (!insc) return 'No inscrito'
-    return insc.completado ? 'Completado' : 'Pendiente'
+    return insc.completado && insc.confirmado ? 'Completado' : 'Pendiente'
   }
 
   const personasFiltradasTablero = personasTablero.filter((p) => {
@@ -478,7 +480,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
       </div>
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-          Equipo / Línea de negocio
+          Equipo
         </label>
         <select
           value={equipoFiltroTablero}
@@ -639,15 +641,21 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                           )
                         }
 
+                        const confirmado = insc.completado && insc.confirmado
+                        const pendienteConfirmar = insc.completado && !insc.confirmado
+                        const puedeConfirmar = isAdmin && pendienteConfirmar && c.tipo === 'Educación Continua'
+
                         const celda = (
                           <span
                             className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold ${
-                              insc.completado
+                              confirmado
                                 ? 'bg-emerald-500 text-white'
-                                : 'bg-red-500 text-white'
+                                : pendienteConfirmar
+                                  ? 'bg-amber-500 text-white'
+                                  : 'bg-red-500 text-white'
                             }`}
                           >
-                            {insc.completado ? '✓' : '✕'}
+                            {confirmado ? '✓' : pendienteConfirmar ? '!' : '✕'}
                           </span>
                         )
 
@@ -659,31 +667,29 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                         const barColor =
                           pct >= 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-700'
 
+                        const tituloCelda = confirmado
+                          ? `Completado${fecha ? ` el ${fecha}` : ''}`
+                          : pendienteConfirmar
+                            ? `100% · pendiente de confirmación${puedeConfirmar ? ' · clic para confirmar' : ''}`
+                            : 'Pendiente'
+
                         return (
                           <td key={c.id} className="px-3 py-3 text-center">
                             <div className="flex flex-col items-center gap-1">
-                              {isAdmin ? (
+                              {puedeConfirmar ? (
                                 <button
                                   type="button"
                                   disabled={togglingKey === key}
-                                  onClick={() => handleToggleCompletado(p.id, c.id, insc.completado)}
-                                  title={
-                                    insc.completado
-                                      ? `Completado${fecha ? ` el ${fecha}` : ''} · clic para marcar pendiente`
-                                      : 'Pendiente · clic para marcar completado'
-                                  }
+                                  onClick={() => handleConfirmarCompletado(p.id, c.id)}
+                                  title={tituloCelda}
                                   className="disabled:opacity-50"
                                 >
                                   {celda}
                                 </button>
                               ) : (
-                                <span
-                                  title={insc.completado ? `Completado${fecha ? ` el ${fecha}` : ''}` : 'Pendiente'}
-                                >
-                                  {celda}
-                                </span>
+                                <span title={tituloCelda}>{celda}</span>
                               )}
-                              {insc.completado && fecha && (
+                              {confirmado && fecha && (
                                 <span className="text-[10px] whitespace-nowrap text-gray-400 dark:text-gray-500">
                                   {fecha}
                                 </span>
