@@ -30,6 +30,7 @@ type Curso = {
   nombre: string
   tipo: Tipo
   duracionValor: number
+  capitulos: number[] | null
 }
 
 type Horario = {
@@ -100,6 +101,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
           nombre: (data.nombre as string) ?? d.id,
           tipo: (data.tipo as Tipo) ?? 'Academia',
           duracionValor: (data.duracionValor as number) ?? 0,
+          capitulos: (data.capitulos as number[] | undefined) ?? null,
         }
       })
       setCursosPorId(map)
@@ -200,6 +202,23 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
       return { id, nombre: curso?.nombre ?? id, tipo: curso?.tipo ?? null, proxima }
     })
   }, [cursoIds, cursosPorId, horariosPorCurso])
+
+  const capitulosInfo = useMemo(() => {
+    const capitulos = cursoSeleccionado?.capitulos
+    if (!capitulos || capitulos.length === 0) return []
+    let inicio = 1
+    return capitulos.map((lecciones, i) => {
+      const fin = inicio + lecciones - 1
+      const info = { numero: i + 1, inicio, fin, lecciones }
+      inicio = fin + 1
+      return info
+    })
+  }, [cursoSeleccionado])
+
+  function capituloDeLeccion(leccion: number): number | null {
+    const c = capitulosInfo.find((c) => leccion >= c.inicio && leccion <= c.fin)
+    return c?.numero ?? null
+  }
 
   const leccionesInfo = useMemo(() => {
     const total = cursoSeleccionado?.duracionValor ?? 0
@@ -600,14 +619,23 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                 {rangosRegistrados.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-xs text-gray-400 dark:text-gray-500">Ya registradas:</span>
-                    {rangosRegistrados.map((r) => (
-                      <span
-                        key={`${r.leccionInicial}-${r.leccionFinal}`}
-                        className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                      >
-                        {r.leccionInicial === r.leccionFinal ? r.leccionInicial : `${r.leccionInicial}–${r.leccionFinal}`}
-                      </span>
-                    ))}
+                    {rangosRegistrados.map((r) => {
+                      const capIni = capituloDeLeccion(r.leccionInicial)
+                      const capFin = capituloDeLeccion(r.leccionFinal)
+                      const capTag =
+                        capIni && capFin ? (capIni === capFin ? ` · Cap. ${capIni}` : ` · Cap. ${capIni}–${capFin}`) : ''
+                      return (
+                        <span
+                          key={`${r.leccionInicial}-${r.leccionFinal}`}
+                          className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                        >
+                          {r.leccionInicial === r.leccionFinal
+                            ? r.leccionInicial
+                            : `${r.leccionInicial}–${r.leccionFinal}`}
+                          {capTag}
+                        </span>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -631,11 +659,15 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                       >
                         <option value="">Selecciona...</option>
-                        {leccionesInfo.libres.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
+                        {leccionesInfo.libres.map((n) => {
+                          const cap = capituloDeLeccion(n)
+                          return (
+                            <option key={n} value={n}>
+                              {n}
+                              {cap ? ` (Cap. ${cap})` : ''}
+                            </option>
+                          )
+                        })}
                       </select>
                     </div>
                     <div>
@@ -649,11 +681,15 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                       >
                         <option value="">Selecciona...</option>
-                        {opcionesLeccionFinal.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
+                        {opcionesLeccionFinal.map((n) => {
+                          const cap = capituloDeLeccion(n)
+                          return (
+                            <option key={n} value={n}>
+                              {n}
+                              {cap ? ` (Cap. ${cap})` : ''}
+                            </option>
+                          )
+                        })}
                       </select>
                     </div>
                   </div>

@@ -1,21 +1,30 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 import Login from './Login'
 import Sidebar from './Sidebar'
 import MiPanel from './MiPanel'
 import RegistrarAvance from './RegistrarAvance'
-import Dashboard from './Dashboard'
-import Horarios from './Horarios'
-import InformeSemanal from './InformeSemanal'
-import Colaboradores from './Colaboradores'
-import ListadoCursos from './ListadoCursos'
-import Alertas from './Alertas'
 import ComingSoon from './ComingSoon'
 import { useTheme } from './useTheme'
 import { useAuth } from './useAuth'
 import { auth } from './firebase'
 import { navLabels, type ViewId } from './nav'
+
+const Dashboard = lazy(() => import('./Dashboard'))
+const Horarios = lazy(() => import('./Horarios'))
+const InformeSemanal = lazy(() => import('./InformeSemanal'))
+const Colaboradores = lazy(() => import('./Colaboradores'))
+const ListadoCursos = lazy(() => import('./ListadoCursos'))
+const Alertas = lazy(() => import('./Alertas'))
+
+function ViewFallback() {
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-indigo-400" />
+    </div>
+  )
+}
 
 function App() {
   const { firebaseUser, role, nombre, puedeCambiarPassword, loading, blockedMessage } = useAuth()
@@ -79,7 +88,9 @@ function App() {
         onToggleTheme={toggleTheme}
         onLogout={() => signOut(auth)}
       />
-      <main className="flex-1 overflow-y-auto p-6">{content}</main>
+      <main className="flex-1 overflow-y-auto p-6">
+        <Suspense fallback={<ViewFallback />}>{content}</Suspense>
+      </main>
     </div>
   )
 }

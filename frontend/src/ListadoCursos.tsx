@@ -13,6 +13,10 @@ import {
   TriangleAlert,
   ExternalLink,
   Inbox,
+  Layers,
+  GraduationCap,
+  BookText,
+  Building2,
 } from 'lucide-react'
 import {
   collection,
@@ -50,6 +54,7 @@ type Curso = {
   estado: Estado
   tipo: Tipo
   link: string | null
+  capitulos: number[] | null
 }
 
 const estadoStyles: Record<Estado, string> = {
@@ -65,7 +70,6 @@ function iniciales(nombre: string): string {
 }
 
 const estados: Estado[] = ['Activo', 'Inactivo', 'Próximo']
-const tipos: Tipo[] = ['Educación Continua', 'Academia', 'Unimetab']
 const duracionUnidades: DuracionUnidad[] = ['Semanas', 'Lecciones']
 const tabs: Tab[] = ['Todos los cursos', 'Educación Continua', 'Academia', 'Unimetab', 'Tablero']
 
@@ -78,6 +82,7 @@ const emptyForm = {
   estado: '' as Estado | '',
   tipo: '' as Tipo | '',
   link: '',
+  capitulos: [''] as string[],
 }
 
 type RolUsuario = 'Admin' | 'Usuario'
@@ -368,6 +373,19 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
     paginaActual * PAGE_SIZE,
   )
 
+  const totalLeccionesForm = form.capitulos.reduce((acc, v) => acc + (Number(v) > 0 ? Number(v) : 0), 0)
+
+  function rangoCapitulo(index: number): { inicio: number; fin: number } | null {
+    const n = Number(form.capitulos[index])
+    if (!Number.isInteger(n) || n <= 0) return null
+    let inicio = 1
+    for (let i = 0; i < index; i++) {
+      const prev = Number(form.capitulos[i])
+      if (Number.isInteger(prev) && prev > 0) inicio += prev
+    }
+    return { inicio, fin: inicio + n - 1 }
+  }
+
   function openCreateModal() {
     setEditingId(null)
     setForm(emptyForm)
@@ -386,6 +404,8 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
       estado: curso.estado,
       tipo: curso.tipo,
       link: curso.link ?? '',
+      capitulos:
+        curso.capitulos && curso.capitulos.length > 0 ? curso.capitulos.map((n) => String(n)) : [''],
     })
     setFormError(null)
     setModalOpen(true)
@@ -402,18 +422,43 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
     e.preventDefault()
     setFormError(null)
 
-    const duracionValor = Number(form.duracionValor)
+    const esUnimetab = form.tipo === 'Unimetab'
+    const capitulosNums = form.capitulos.map((c) => Number(c))
+
     if (
       !form.nombre.trim() ||
       !form.categoria.trim() ||
       !form.instructor.trim() ||
-      !form.duracionValor ||
-      duracionValor <= 0 ||
       !form.estado ||
       !form.tipo
     ) {
       setFormError('Completá todos los campos.')
       return
+    }
+
+    let duracionValor: number
+    let duracionUnidad: DuracionUnidad
+    let capitulos: number[] | null
+
+    if (esUnimetab) {
+      if (
+        capitulosNums.length === 0 ||
+        capitulosNums.some((n) => !Number.isInteger(n) || n <= 0)
+      ) {
+        setFormError('Indicá cuántas lecciones tiene cada capítulo.')
+        return
+      }
+      capitulos = capitulosNums
+      duracionValor = capitulosNums.reduce((acc, n) => acc + n, 0)
+      duracionUnidad = 'Lecciones'
+    } else {
+      duracionValor = Number(form.duracionValor)
+      if (!form.duracionValor || duracionValor <= 0) {
+        setFormError('Completá todos los campos.')
+        return
+      }
+      duracionUnidad = form.duracionUnidad
+      capitulos = null
     }
 
     setSubmitting(true)
@@ -423,10 +468,11 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
         categoria: form.categoria.trim(),
         instructor: form.instructor.trim(),
         duracionValor,
-        duracionUnidad: form.duracionUnidad,
+        duracionUnidad,
         estado: form.estado,
         tipo: form.tipo,
         link: form.link.trim() || null,
+        capitulos,
       }
       if (editingId) {
         await updateDoc(doc(db, 'cursos', editingId), payload)
@@ -885,8 +931,8 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+          <div className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
               <div className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
                   {editingId ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
@@ -909,103 +955,188 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-5">
-              <div>
-                <label htmlFor="nombre" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Nombre
-                </label>
-                <input
-                  id="nombre"
-                  type="text"
-                  value={form.nombre}
-                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="categoria" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Categoría
-                </label>
-                <input
-                  id="categoria"
-                  type="text"
-                  value={form.categoria}
-                  onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="instructor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Instructor
-                </label>
-                <input
-                  id="instructor"
-                  type="text"
-                  value={form.instructor}
-                  onChange={(e) => setForm({ ...form, instructor: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <label htmlFor="duracionValor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Duración
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5 overflow-y-auto px-6 py-5">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label htmlFor="nombre" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Nombre
                   </label>
                   <input
-                    id="duracionValor"
-                    type="number"
-                    min="1"
-                    value={form.duracionValor}
-                    onChange={(e) => setForm({ ...form, duracionValor: e.target.value })}
+                    id="nombre"
+                    type="text"
+                    value={form.nombre}
+                    onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                    placeholder="Ej. Fundamentos de nutrición clínica"
                     className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                 </div>
-                <div className="flex-1">
-                  <label htmlFor="duracionUnidad" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Unidad
-                  </label>
-                  <select
-                    id="duracionUnidad"
-                    value={form.duracionUnidad}
-                    onChange={(e) =>
-                      setForm({ ...form, duracionUnidad: e.target.value as DuracionUnidad })
-                    }
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  >
-                    {duracionUnidades.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
+
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label htmlFor="categoria" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Categoría
+                    </label>
+                    <input
+                      id="categoria"
+                      type="text"
+                      value={form.categoria}
+                      onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label htmlFor="instructor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Instructor
+                    </label>
+                    <input
+                      id="instructor"
+                      type="text"
+                      value={form.instructor}
+                      onChange={(e) => setForm({ ...form, instructor: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                  </div>
                 </div>
               </div>
 
+              <hr className="border-gray-100 dark:border-gray-800" />
+
               <div>
-                <label htmlFor="tipo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Tipo
-                </label>
-                <select
-                  id="tipo"
-                  value={form.tipo}
-                  onChange={(e) => setForm({ ...form, tipo: e.target.value as Tipo })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option value="">Seleccionar...</option>
-                  {tipos.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de curso</span>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                  {(
+                    [
+                      { valor: 'Educación Continua', icono: GraduationCap },
+                      { valor: 'Academia', icono: BookText },
+                      { valor: 'Unimetab', icono: Building2 },
+                    ] as const
+                  ).map(({ valor, icono: Icono }) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      onClick={() => setForm({ ...form, tipo: valor })}
+                      className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition-all ${
+                        form.tipo === valor
+                          ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-950 dark:text-indigo-400'
+                          : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      <Icono className="h-4 w-4" />
+                      <span className="text-center leading-tight">{valor}</span>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
+
+              {form.tipo === 'Unimetab' ? (
+                <div className="animate-fade-in rounded-xl border border-gray-200 bg-gray-50/60 p-3.5 dark:border-gray-800 dark:bg-gray-950/40">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <Layers className="h-4 w-4 text-blue-600 dark:text-indigo-400" />
+                      Capítulos y lecciones
+                    </span>
+                    {totalLeccionesForm > 0 && (
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-blue-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                        {totalLeccionesForm} lecciones · {form.capitulos.length} cap.
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex flex-col gap-2">
+                    {form.capitulos.map((valor, i) => {
+                      const rango = rangoCapitulo(i)
+                      return (
+                        <div key={i} className="animate-fade-in flex items-center gap-2">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            {i + 1}
+                          </span>
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="N.º de lecciones"
+                              value={valor}
+                              onChange={(e) => {
+                                const capitulos = [...form.capitulos]
+                                capitulos[i] = e.target.value
+                                setForm({ ...form, capitulos })
+                              }}
+                              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+                            />
+                            {rango && (
+                              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                Lecciones {rango.inicio}–{rango.fin}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm({
+                                ...form,
+                                capitulos: form.capitulos.filter((_, idx) => idx !== i),
+                              })
+                            }
+                            disabled={form.capitulos.length === 1}
+                            className="shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-red-500/10"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, capitulos: [...form.capitulos, ''] })}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 py-2 text-sm font-medium text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-400 dark:hover:text-indigo-400"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Agregar capítulo
+                  </button>
+                </div>
+              ) : (
+                <div className="animate-fade-in flex gap-3">
+                  <div className="flex-1">
+                    <label htmlFor="duracionValor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Duración
+                    </label>
+                    <input
+                      id="duracionValor"
+                      type="number"
+                      min="1"
+                      value={form.duracionValor}
+                      onChange={(e) => setForm({ ...form, duracionValor: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label htmlFor="duracionUnidad" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Unidad
+                    </label>
+                    <select
+                      id="duracionUnidad"
+                      value={form.duracionUnidad}
+                      onChange={(e) =>
+                        setForm({ ...form, duracionUnidad: e.target.value as DuracionUnidad })
+                      }
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    >
+                      {duracionUnidades.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <hr className="border-gray-100 dark:border-gray-800" />
 
               <div>
                 <label htmlFor="link" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Enlace externo (opcional)
+                  Enlace externo <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
                 </label>
                 <input
                   id="link"
@@ -1018,32 +1149,33 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
               </div>
 
               <div>
-                <label htmlFor="estado" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Estado
-                </label>
-                <select
-                  id="estado"
-                  value={form.estado}
-                  onChange={(e) => setForm({ ...form, estado: e.target.value as Estado })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option value="">Seleccionar...</option>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Estado</span>
+                <div className="mt-1.5 flex gap-1.5">
                   {estados.map((e) => (
-                    <option key={e} value={e}>
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setForm({ ...form, estado: e })}
+                      className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-all ${
+                        form.estado === e
+                          ? estadoStyles[e] + ' border-transparent shadow-sm'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                      }`}
+                    >
                       {e}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
               {formError && (
-                <p className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
+                <p className="animate-shake animate-fade-in flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
                   <TriangleAlert className="h-4 w-4 shrink-0" />
                   {formError}
                 </p>
               )}
 
-              <div className="mt-2 flex justify-end gap-3">
+              <div className="mt-1 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
