@@ -23,5 +23,5 @@ jobs:
       - run: node index.js
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          ALERTAS_FROM_EMAIL: ${{ secrets.ALERTAS_FROM_EMAIL }}
+          APPSCRIPT_URL: ${{ secrets.APPSCRIPT_URL }}
+          APPSCRIPT_TOKEN: ${{ secrets.APPSCRIPT_TOKEN }}

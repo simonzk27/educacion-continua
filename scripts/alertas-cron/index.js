@@ -1,13 +1,7 @@
-// Cron job: revisa las sesiones programadas y envía un recordatorio por correo
-// "minutosAntes" antes de que empiecen, a colaboradores activos. Corre vía
-// GitHub Actions (ver .github/workflows/alertas-cron.yml), no depende de
-// Firebase Functions ni de ningún plan pago.
-
 const admin = require('firebase-admin')
 
-// Colombia no observa horario de verano: offset fijo UTC-5.
 const BOGOTA_OFFSET_MS = 5 * 60 * 60 * 1000
-const CATCH_UP_WINDOW_MS = 35 * 60 * 1000 // debe ser >= al intervalo del cron
+const CATCH_UP_WINDOW_MS = 35 * 60 * 1000 
 
 const DIA_INDEX = {
   Lunes: 0,
@@ -35,15 +29,11 @@ function addDaysIso(iso, delta) {
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`
 }
 
-// Instante UTC (ms) correspondiente a una fecha+hora en horario de Bogotá.
 function bogotaDateTimeToUtcMs(fechaIso, horaHHmm) {
   const [y, m, d] = fechaIso.split('-').map(Number)
   const [hh, mm] = horaHHmm.split(':').map(Number)
   return Date.UTC(y, m - 1, d, hh, mm) + BOGOTA_OFFSET_MS
 }
-
-// Misma lógica que frontend/src/scheduleUtils.ts (ocurrenciasEntre), portada
-// a JS plano porque este script corre fuera del bundle de Vite.
 function ocurrenciasEntre(h, desde, hasta) {
   if (h.modo === 'mensual') {
     return (h.fechas || []).filter((f) => f >= desde && f <= hasta).sort()
@@ -90,17 +80,18 @@ function formatFechaLarga(fechaIso) {
 }
 
 async function enviarCorreo({ to, nombre, curso, fecha, hora, minutosAntes }) {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) throw new Error('Falta RESEND_API_KEY')
-  const from = process.env.ALERTAS_FROM_EMAIL || 'onboarding@resend.dev'
+  const url = process.env.APPSCRIPT_URL
+  const token = process.env.APPSCRIPT_TOKEN
+  if (!url) throw new Error('Falta APPSCRIPT_URL')
+  if (!token) throw new Error('Falta APPSCRIPT_TOKEN')
 
   const cuandoTexto = minutosAntes >= 60 ? `${Math.round(minutosAntes / 60)} h` : `${minutosAntes} min`
 
-  const res = await fetch('https://api.resend.com/emails', {
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from,
+      token,
       to,
       subject: `Recordatorio: tu sesión de "${curso}" empieza en ${cuandoTexto}`,
       html: `
@@ -116,9 +107,15 @@ async function enviarCorreo({ to, nombre, curso, fecha, hora, minutosAntes }) {
     }),
   })
 
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Resend respondió ${res.status}: ${text}`)
+  const text = await res.text()
+  let data
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`Apps Script respondió algo inesperado (HTTP ${res.status}): ${text}`)
+  }
+  if (!res.ok || !data.ok) {
+    throw new Error(`Apps Script error: ${data.error || text}`)
   }
 }
 
@@ -173,9 +170,9 @@ async function main() {
       const sessionUtcMs = bogotaDateTimeToUtcMs(fecha, h.hora)
       const alertUtcMs = sessionUtcMs - minutosAntes * 60 * 1000
 
-      if (nowMs < alertUtcMs) continue // todavía no toca avisar
-      if (nowMs > sessionUtcMs) continue // la sesión ya empezó
-      if (nowMs - alertUtcMs > CATCH_UP_WINDOW_MS) continue // se pasó la ventana, evita spam viejo
+      if (nowMs < alertUtcMs) continue 
+      if (nowMs > sessionUtcMs) continue 
+      if (nowMs - alertUtcMs > CATCH_UP_WINDOW_MS) continue 
 
       const dedupeKey = `${horarioDoc.id}_${fecha}`
       const dedupeRef = db.collection('alertasEnviadas').doc(dedupeKey)
@@ -188,7 +185,7 @@ async function main() {
         })
       } catch {
         omitidos++
-        continue // ya se había enviado (otra corrida del cron ya lo tomó)
+        continue 
       }
 
       try {
@@ -204,7 +201,7 @@ async function main() {
         console.log(`Enviado a ${user.email} — ${curso.nombre} ${fecha} ${h.hora}`)
       } catch (err) {
         console.error(`Error enviando a ${user.email}:`, err.message)
-        await dedupeRef.delete().catch(() => {}) // permite reintento en la próxima corrida
+        await dedupeRef.delete().catch(() => {})
       }
     }
   }
