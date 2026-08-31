@@ -1,4 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  ArrowRight,
+  BookOpen,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  Inbox,
+  KeyRound,
+} from 'lucide-react'
 import { collection, collectionGroup, limit, onSnapshot, orderBy, query, where, doc, updateDoc } from 'firebase/firestore'
 import {
   EmailAuthProvider,
@@ -47,6 +57,12 @@ type MiPanelProps = {
   readonly userId: string
   readonly puedeCambiarPassword: boolean
   readonly onRegistrarAvance: () => void
+}
+
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).slice(0, 2)
+  const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
+  return letras || '?'
 }
 
 const passwordErrorMessages: Record<string, string> = {
@@ -237,49 +253,64 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Hola, {primerNombre}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{formatFechaSesion(todayIso())}</p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white dark:bg-indigo-500">
+            {iniciales(nombre ?? primerNombre)}
+          </span>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Hola, {primerNombre}</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{formatFechaSesion(todayIso())}</p>
+          </div>
         </div>
       </div>
 
       <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-400 p-6 text-white shadow-sm dark:from-indigo-500 dark:to-indigo-400">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-medium tracking-wide text-blue-100 uppercase dark:text-indigo-100">
+            <p className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-blue-100 uppercase dark:text-indigo-100">
+              <CalendarClock className="h-3.5 w-3.5" />
               Tu próxima sesión
             </p>
             {proximaSesion ? (
               <>
-                <h2 className="mt-1 text-xl font-bold">{proximaSesion.nombre}</h2>
+                <h2 className="mt-1.5 text-xl font-bold">{proximaSesion.nombre}</h2>
                 <p className="mt-1 text-sm text-blue-50 dark:text-indigo-50">
                   {formatFechaSesion(proximaSesion.fecha)} · {formatHora(proximaSesion.hora)}
                 </p>
               </>
             ) : (
-              <h2 className="mt-1 text-xl font-bold">No tenés sesiones programadas</h2>
+              <h2 className="mt-1.5 text-xl font-bold">No tenés sesiones programadas</h2>
             )}
           </div>
           <button
             type="button"
             onClick={onRegistrarAvance}
-            className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-600 shadow-sm hover:bg-blue-50 dark:text-indigo-600 dark:hover:bg-indigo-50"
+            className="flex w-fit items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-blue-50 dark:text-indigo-600 dark:hover:bg-indigo-50"
           >
-            Registrar avance →
+            Registrar avance
+            <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-          <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+          <p className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+            <BookOpen className="h-3.5 w-3.5" />
             Cursos actuales
           </p>
           {loading ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={`skeleton-curso-${i}`} className="h-14 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+              ))}
+            </div>
           ) : cursosActuales.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500">No tenés cursos asignados todavía.</p>
+            <div className="flex flex-col items-center gap-2 py-6 text-gray-400 dark:text-gray-500">
+              <Inbox className="h-8 w-8" />
+              <p className="text-sm">No tenés cursos asignados todavía.</p>
+            </div>
           ) : (
             <div className="flex flex-col gap-4">
               {cursosActuales.map((c) => (
@@ -287,10 +318,20 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                   <div className="flex items-center justify-between text-sm">
                     <div>
                       <p className="font-semibold text-gray-900 dark:text-gray-100">{c.nombre}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{c.estado}</p>
+                      <p
+                        className={`text-xs font-medium ${
+                          c.estado === 'Completado'
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : c.estado === 'En progreso'
+                              ? 'text-blue-600 dark:text-indigo-400'
+                              : 'text-gray-400 dark:text-gray-500'
+                        }`}
+                      >
+                        {c.estado}
+                      </p>
                     </div>
                     {c.progreso !== null && (
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
                         {c.progreso}%
                       </span>
                     )}
@@ -298,7 +339,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                   {c.progreso !== null && (
                     <div className="mt-2 h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800">
                       <div
-                        className="h-1.5 rounded-full bg-blue-500 dark:bg-indigo-500"
+                        className="h-1.5 rounded-full bg-blue-500 transition-[width] dark:bg-indigo-500"
                         style={{ width: `${c.progreso}%` }}
                       />
                     </div>
@@ -310,19 +351,28 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-          <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+          <p className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+            <CalendarClock className="h-3.5 w-3.5" />
             Próximas sesiones
           </p>
           {loading ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={`skeleton-sesion-${i}`} className="h-9 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+              ))}
+            </div>
           ) : proximasSesiones.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500">No tenés sesiones programadas.</p>
+            <div className="flex flex-col items-center gap-2 py-6 text-gray-400 dark:text-gray-500">
+              <Inbox className="h-8 w-8" />
+              <p className="text-sm">No tenés sesiones programadas.</p>
+            </div>
           ) : (
             <ul className="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
               {proximasSesiones.map((s, i) => (
                 <li key={i} className="flex items-center justify-between py-2.5 text-sm">
                   <span className="font-medium text-gray-900 dark:text-gray-100">{s.nombre}</span>
-                  <span className="text-gray-500 dark:text-gray-400">
+                  <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
                     {formatFechaSesion(s.fecha)} · {formatHora(s.hora)}
                   </span>
                 </li>
@@ -333,11 +383,21 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+        <p className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+          <ClipboardList className="h-3.5 w-3.5" />
           Últimos reportes
         </p>
-        {ultimosReportes.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">Todavía no registraste ningún avance.</p>
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={`skeleton-reporte-${i}`} className="h-9 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+            ))}
+          </div>
+        ) : ultimosReportes.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-gray-400 dark:text-gray-500">
+            <Inbox className="h-8 w-8" />
+            <p className="text-sm">Todavía no registraste ningún avance.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
@@ -351,7 +411,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {ultimosReportes.map((r) => (
-                  <tr key={r.id}>
+                  <tr key={r.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                     <td className="py-2.5 pr-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                       {formatFechaSesion(r.fecha)}
                     </td>
@@ -370,11 +430,13 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
 
       {puedeCambiarPassword && (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-          <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+          <p className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+            <KeyRound className="h-3.5 w-3.5" />
             Cambiar contraseña
           </p>
           {pwExito ? (
-            <p className="text-sm text-emerald-600 dark:text-emerald-400">
+            <p className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
               Contraseña actualizada correctamente.
             </p>
           ) : (
@@ -388,7 +450,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                   type="password"
                   value={pwActual}
                   onChange={(e) => setPwActual(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
               <div>
@@ -401,7 +463,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                   value={pwNueva}
                   onChange={(e) => setPwNueva(e.target.value)}
                   placeholder="Mínimo 8 caracteres y un número"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
               <div>
@@ -413,15 +475,16 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                   type="password"
                   value={pwConfirmar}
                   onChange={(e) => setPwConfirmar(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
               {pwError && <p className="text-sm text-red-600 dark:text-red-400">{pwError}</p>}
               <button
                 type="submit"
                 disabled={pwSubmitting}
-                className="mt-1 w-fit rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                className="mt-1 flex w-fit items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
               >
+                <KeyRound className="h-4 w-4" />
                 {pwSubmitting ? 'Guardando...' : 'Cambiar contraseña'}
               </button>
             </form>

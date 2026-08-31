@@ -1,0 +1,13 @@
+{
+  "name": "wipe-avances",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-off: borra todos los docs de 'avances' (datos de prueba) y resetea completado/confirmado/fechaCompletado en todas las inscripciones.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

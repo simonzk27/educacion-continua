@@ -72,7 +72,7 @@ export default function Sidebar({
         }`}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-sm font-bold text-white">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white dark:bg-indigo-500">
             EC
           </div>
           {!collapsed && (
@@ -91,7 +91,7 @@ export default function Sidebar({
           type="button"
           onClick={onToggleCollapsed}
           title={collapsed ? 'Expandir' : 'Minimizar'}
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:border-indigo-500/50 dark:hover:text-indigo-400 ${
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:border-blue-300 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:border-indigo-500/50 dark:hover:text-indigo-400 dark:focus-visible:ring-indigo-500 ${
             collapsed ? 'mt-1' : ''
           }`}
         >
@@ -117,7 +117,7 @@ export default function Sidebar({
                       type="button"
                       title={collapsed ? item.label : undefined}
                       onClick={() => onNavigate(item.id)}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:focus-visible:ring-indigo-500 ${
                         collapsed ? 'justify-center' : ''
                       } ${
                         isActive
@@ -125,6 +125,9 @@ export default function Sidebar({
                           : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900'
                       }`}
                     >
+                      {isActive && (
+                        <span className="absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full bg-blue-600 dark:bg-indigo-400" />
+                      )}
                       <Icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
                     </button>
@@ -150,7 +153,7 @@ export default function Sidebar({
                   setUserMenuOpen(false)
                   onLogout()
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
               >
                 <LogOut className="h-4 w-4 shrink-0" />
                 Cerrar sesión
@@ -162,11 +165,11 @@ export default function Sidebar({
             type="button"
             onClick={() => setUserMenuOpen((open) => !open)}
             title={collapsed ? displayName : undefined}
-            className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-900 ${
+            className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:hover:bg-gray-900 dark:focus-visible:ring-indigo-500 ${
               collapsed ? 'justify-center' : ''
             }`}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
               {initials}
             </div>
             {!collapsed && (
@@ -184,11 +187,15 @@ export default function Sidebar({
           type="button"
           onClick={onToggleTheme}
           title={collapsed ? 'Cambiar tema' : undefined}
-          className={`mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900 ${
+          className={`mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:text-gray-300 dark:hover:bg-gray-900 dark:focus-visible:ring-indigo-500 ${
             collapsed ? 'justify-center' : ''
           }`}
         >
-          {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+          {theme === 'dark' ? (
+            <Sun className="h-4 w-4 shrink-0 text-amber-500" />
+          ) : (
+            <Moon className="h-4 w-4 shrink-0 text-blue-600" />
+          )}
           {!collapsed && <span>Cambiar tema</span>}
         </button>
       </div>

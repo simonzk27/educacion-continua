@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Download, Send } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Inbox, Users, ListChecks, BookOpen } from 'lucide-react'
 import { collection, collectionGroup, onSnapshot, type Timestamp } from 'firebase/firestore'
+import * as XLSX from 'xlsx'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { db } from './firebase'
 import {
   type Dia,
@@ -57,6 +60,12 @@ function horarioKey(cursoId: string, userId: string): string {
   return `${cursoId}_${userId}`
 }
 
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).slice(0, 2)
+  const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
+  return letras || '?'
+}
+
 const equipos = ['Educación Continua', 'Unimetab', 'Academia']
 
 function cumplimientoStyle(pct: number) {
@@ -86,11 +95,6 @@ function horarioLabel(horario: Horario | undefined, inicio: string, fin: string)
   }
   const dias = [...horario.dias].sort((a, b) => diaIndex[a] - diaIndex[b]).map((d) => diaCorto[d])
   return `${dias.join(', ')} ${formatHora(horario.hora)}`
-}
-
-function csvEscape(value: string | number): string {
-  const str = String(value)
-  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
 }
 
 type FilaStaff = {
@@ -304,8 +308,19 @@ export default function InformeSemanal() {
   const totalCompletaciones = grupos.reduce((sum, g) => sum + g.filas.reduce((s, f) => s + f.completaciones, 0), 0)
   const totalLecciones = grupos.reduce((sum, g) => sum + g.filas.reduce((s, f) => s + f.lecciones, 0), 0)
 
-  function exportarCsv() {
-    const filas = grupos.flatMap((g) =>
+  const encabezadoInforme = [
+    'Equipo',
+    'Colaborador',
+    'Curso actual',
+    'Curso a seguir',
+    'Horarios',
+    'Completaciones',
+    'Lecciones',
+    'Observaciones',
+  ]
+
+  function filasInforme(): (string | number)[][] {
+    return grupos.flatMap((g) =>
       g.filas.map((f) => [
         g.titulo,
         f.colaborador,
@@ -317,24 +332,30 @@ export default function InformeSemanal() {
         f.observaciones,
       ]),
     )
-    const encabezado = [
-      'Equipo',
-      'Colaborador',
-      'Curso actual',
-      'Curso a seguir',
-      'Horarios',
-      'Completaciones',
-      'Lecciones',
-      'Observaciones',
-    ]
-    const csv = [encabezado, ...filas].map((fila) => fila.map(csvEscape).join(',')).join('\n')
-    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `informe-semanal_${inicio}_${fin}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+  }
+
+  function exportarExcel() {
+    const ws = XLSX.utils.aoa_to_sheet([encabezadoInforme, ...filasInforme()])
+    ws['!cols'] = encabezadoInforme.map(() => ({ wch: 18 }))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Informe semanal')
+    XLSX.writeFile(wb, `informe-semanal_${inicio}_${fin}.xlsx`)
+  }
+
+  function exportarPdf() {
+    const doc = new jsPDF({ orientation: 'landscape' })
+    doc.setFontSize(14)
+    doc.text('Informe semanal', 14, 15)
+    doc.setFontSize(10)
+    doc.text(formatRangoSemana(inicio, fin), 14, 21)
+    autoTable(doc, {
+      startY: 26,
+      head: [encabezadoInforme],
+      body: filasInforme(),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [37, 99, 235] },
+    })
+    doc.save(`informe-semanal_${inicio}_${fin}.pdf`)
   }
 
   return (
@@ -374,60 +395,74 @@ export default function InformeSemanal() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={exportarCsv}
+            onClick={exportarExcel}
             className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             <Download className="h-4 w-4" />
-            Excel (CSV)
+            Excel
           </button>
           <button
             type="button"
-            disabled
-            title="Próximamente"
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-400 opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-500"
+            onClick={exportarPdf}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             <Download className="h-4 w-4" />
             PDF
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Próximamente"
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white opacity-60 shadow-sm dark:bg-indigo-500"
-          >
-            <Send className="h-4 w-4" />
-            Enviar a gerencia
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:max-w-md">
-        <div className="rounded-2xl bg-emerald-50 p-5 dark:bg-emerald-500/10">
-          <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{totalCompletaciones}</p>
-          <p className="text-sm text-emerald-700/80 dark:text-emerald-400/80">Total completaciones</p>
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 transition-shadow hover:shadow-md dark:border-emerald-500/10 dark:bg-emerald-500/10">
+          <div className="mb-2 flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <ListChecks className="h-4 w-4" />
+            <p className="text-xs font-medium tracking-wide uppercase">Total completaciones</p>
+          </div>
+          <p className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{totalCompletaciones}</p>
         </div>
-        <div className="rounded-2xl bg-emerald-50 p-5 dark:bg-emerald-500/10">
-          <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{totalLecciones}</p>
-          <p className="text-sm text-emerald-700/80 dark:text-emerald-400/80">Total lecciones / pasos</p>
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 transition-shadow hover:shadow-md dark:border-emerald-500/10 dark:bg-emerald-500/10">
+          <div className="mb-2 flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <BookOpen className="h-4 w-4" />
+            <p className="text-xs font-medium tracking-wide uppercase">Total lecciones / pasos</p>
+          </div>
+          <p className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{totalLecciones}</p>
         </div>
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        <div className="flex flex-col gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={`skeleton-grupo-${i}`} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+              <div className="mb-4 h-4 w-40 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+              <div className="flex flex-col gap-2.5">
+                {Array.from({ length: 3 }).map((_, j) => (
+                  <div key={`skeleton-fila-${j}`} className="h-8 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : grupos.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">
-          No hay colaboradores con cursos asignados todavía.
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-gray-200 bg-white py-10 text-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500">
+          <Inbox className="h-8 w-8" />
+          <p className="text-sm">No hay colaboradores con cursos asignados todavía.</p>
+        </div>
       ) : (
         grupos.map((g) => (
-          <div key={g.titulo} className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-            <p className="px-5 pt-4 text-sm font-bold tracking-wide text-blue-600 uppercase dark:text-indigo-400">
-              {g.titulo}
-            </p>
+          <div
+            key={g.titulo}
+            className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+          >
+            <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/40">
+              <Users className="h-4 w-4 text-blue-600 dark:text-indigo-400" />
+              <p className="text-sm font-bold tracking-wide text-blue-600 uppercase dark:text-indigo-400">
+                {g.titulo}
+              </p>
+            </div>
             <div className="overflow-x-auto">
-              <table className="mt-2 w-full min-w-[900px] text-left text-sm">
+              <table className="w-full min-w-[900px] text-left text-sm">
                 <thead>
-                  <tr className="border-y border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
+                  <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
                     <th className="px-5 py-2.5 font-semibold">Colaborador</th>
                     <th className="px-5 py-2.5 font-semibold">Curso actual</th>
                     <th className="px-5 py-2.5 font-semibold">Curso a seguir</th>
@@ -439,9 +474,14 @@ export default function InformeSemanal() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {g.filas.map((f) => (
-                    <tr key={f.colaboradorId}>
+                    <tr key={f.colaboradorId} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                        {f.colaborador}
+                        <span className="inline-flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            {iniciales(f.colaborador)}
+                          </span>
+                          {f.colaborador}
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-blue-600 dark:text-indigo-400">{f.cursoActual}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.cursoASeguir ?? '—'}</td>
@@ -470,19 +510,28 @@ export default function InformeSemanal() {
         ))
       )}
 
-      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <p className="px-5 pt-4 text-sm font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
-          Cumplimiento gerencial
-        </p>
-        {!loading && cumplimiento.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-gray-400 dark:text-gray-500">
-            Nadie tenía sesiones programadas esta semana.
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div className="border-b border-gray-100 bg-gray-50 px-5 py-3 dark:border-gray-800 dark:bg-gray-800/40">
+          <p className="text-sm font-bold tracking-wide text-gray-500 uppercase dark:text-gray-400">
+            Cumplimiento gerencial
           </p>
+        </div>
+        {loading ? (
+          <div className="flex flex-col gap-2.5 p-5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={`skeleton-cump-${i}`} className="h-8 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+            ))}
+          </div>
+        ) : cumplimiento.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-gray-400 dark:text-gray-500">
+            <Inbox className="h-8 w-8" />
+            <p className="text-sm">Nadie tenía sesiones programadas esta semana.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="mt-2 w-full min-w-[700px] text-left text-sm">
+            <table className="w-full min-w-[700px] text-left text-sm">
               <thead>
-                <tr className="border-y border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
+                <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
                   <th className="px-5 py-2.5 font-semibold">Colaborador</th>
                   <th className="px-5 py-2.5 font-semibold">Equipo</th>
                   <th className="px-5 py-2.5 font-semibold">Sesiones programadas</th>
@@ -495,9 +544,14 @@ export default function InformeSemanal() {
                 {cumplimiento.map((f) => {
                   const pct = Math.round((f.realizados / f.programadas) * 100)
                   return (
-                    <tr key={f.colaboradorId}>
+                    <tr key={f.colaboradorId} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                        {f.colaborador}
+                        <span className="inline-flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            {iniciales(f.colaborador)}
+                          </span>
+                          {f.colaborador}
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo}</td>
                       <td className="px-5 py-3 text-gray-900 dark:text-gray-100">{f.programadas}</td>
@@ -520,7 +574,6 @@ export default function InformeSemanal() {
             </table>
           </div>
         )}
-        <div className="h-4" />
       </div>
     </div>
   )

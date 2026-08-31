@@ -87,13 +87,16 @@ export default function Alertas({ userId }: AlertasProps) {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        <div className="flex flex-col gap-3">
+          <div className="h-16 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+          <div className="h-40 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+        </div>
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
+          className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
         >
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-gray-200 px-3.5 py-3 dark:border-gray-800">
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-gray-200 px-3.5 py-3 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50">
             <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <BellRing className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               Activar alertas por correo
@@ -102,7 +105,7 @@ export default function Alertas({ userId }: AlertasProps) {
               type="checkbox"
               checked={config.activo}
               onChange={(e) => setConfig({ ...config, activo: e.target.checked })}
-              className="h-5 w-5 accent-blue-600 dark:accent-indigo-500"
+              className="h-5 w-5 cursor-pointer accent-blue-600 dark:accent-indigo-500"
             />
           </label>
 

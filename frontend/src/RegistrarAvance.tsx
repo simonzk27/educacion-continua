@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { CalendarClock, Clock, CheckCircle2, Inbox } from 'lucide-react'
 import {
   addDoc,
   collection,
@@ -49,12 +50,17 @@ type InscripcionSeleccionada = {
 const emptyForm = {
   fecha: '',
   horaInicio: '',
-  horaFin: '',
-  lecciones: '',
   leccionInicial: '',
   leccionFinal: '',
   aprendizaje: '',
   comentario: '',
+}
+
+const dateTimeInputClass =
+  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:[color-scheme:dark]'
+
+function rangosSolapan(aInicio: number, aFin: number, bInicio: number, bFin: number): boolean {
+  return aInicio <= bFin && bInicio <= aFin
 }
 
 const emptyFormEC = {
@@ -82,6 +88,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
 
   const [inscripcionSeleccionada, setInscripcionSeleccionada] = useState<InscripcionSeleccionada | null>(null)
   const [avanceExistenteEC, setAvanceExistenteEC] = useState<boolean | null>(null)
+  const [rangosRegistrados, setRangosRegistrados] = useState<{ leccionInicial: number; leccionFinal: number }[]>([])
 
   useEffect(() => {
     return onSnapshot(collection(db, 'cursos'), (snap) => {
@@ -190,9 +197,33 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
       if (curso && curso.tipo !== 'Educación Continua' && horario?.hora) {
         proxima = ocurrenciasEntre(horario, hoy, ventana)[0] ?? null
       }
-      return { id, nombre: curso?.nombre ?? id, proxima }
+      return { id, nombre: curso?.nombre ?? id, tipo: curso?.tipo ?? null, proxima }
     })
   }, [cursoIds, cursosPorId, horariosPorCurso])
+
+  const leccionesInfo = useMemo(() => {
+    const total = cursoSeleccionado?.duracionValor ?? 0
+    const cubiertas = new Set<number>()
+    rangosRegistrados.forEach((r) => {
+      for (let i = r.leccionInicial; i <= r.leccionFinal; i++) cubiertas.add(i)
+    })
+    const libres: number[] = []
+    for (let i = 1; i <= total; i++) {
+      if (!cubiertas.has(i)) libres.push(i)
+    }
+    return { total, cubiertas, libres }
+  }, [cursoSeleccionado, rangosRegistrados])
+
+  const opcionesLeccionFinal = useMemo(() => {
+    const inicial = Number(form.leccionInicial)
+    if (!form.leccionInicial || !Number.isInteger(inicial) || leccionesInfo.cubiertas.has(inicial)) return []
+    const out: number[] = []
+    for (let i = inicial; i <= leccionesInfo.total; i++) {
+      if (leccionesInfo.cubiertas.has(i)) break
+      out.push(i)
+    }
+    return out
+  }, [form.leccionInicial, leccionesInfo])
 
   const sesionObjetivo = useMemo(() => {
     if (!selectedCursoId || esEducacionContinua) return null
@@ -224,23 +255,53 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
     if (!sesionObjetivo) return
     setForm((prev) => ({
       ...prev,
-      fecha: prev.fecha || sesionObjetivo.fecha,
       horaInicio: prev.horaInicio || sesionObjetivo.hora,
     }))
   }, [sesionObjetivo])
 
   useEffect(() => {
-    setForm(emptyForm)
+    setForm({ ...emptyForm, fecha: todayIso() })
     setFormEC(emptyFormEC)
     setFormError(null)
     setGuardado(false)
   }, [selectedCursoId])
 
+  useEffect(() => {
+    if (!selectedCursoId || esEducacionContinua) {
+      setRangosRegistrados([])
+      return
+    }
+    const q = query(
+      collection(db, 'avances'),
+      where('userId', '==', userId),
+      where('cursoId', '==', selectedCursoId),
+    )
+    return onSnapshot(q, (snap) => {
+      const rangos = snap.docs
+        .map((d) => {
+          const data = d.data()
+          const leccionInicial = data.leccionInicial as number | null
+          const leccionFinal = data.leccionFinal as number | null
+          if (leccionInicial == null || leccionFinal == null) return null
+          return { leccionInicial, leccionFinal }
+        })
+        .filter((r): r is { leccionInicial: number; leccionFinal: number } => r !== null)
+        .sort((a, b) => a.leccionInicial - b.leccionInicial)
+      setRangosRegistrados(rangos)
+    })
+  }, [selectedCursoId, esEducacionContinua, userId])
+
   function validar(): string | null {
     if (!sesionObjetivo) return 'No tenés una sesión programada para registrar avance.'
-    if (!form.fecha) return 'Seleccioná la fecha de la sesión.'
-    if (!form.horaInicio || !form.horaFin) return 'Completá hora de inicio y hora de fin.'
-    if (!form.lecciones || Number(form.lecciones) < 0) return 'Ingresá cuántas lecciones avanzaste.'
+    if (!form.horaInicio) return 'Completá la hora de inicio.'
+    if (!form.leccionInicial || !form.leccionFinal) return 'Indicá lección inicial y lección final.'
+    const inicial = Number(form.leccionInicial)
+    const final = Number(form.leccionFinal)
+    if (!Number.isInteger(inicial) || inicial < 1) return 'La lección inicial debe ser un número entero mayor a 0.'
+    if (!Number.isInteger(final) || final < 1) return 'La lección final debe ser un número entero mayor a 0.'
+    if (final < inicial) return 'La lección final no puede ser menor a la lección inicial.'
+    const solapa = rangosRegistrados.some((r) => rangosSolapan(inicial, final, r.leccionInicial, r.leccionFinal))
+    if (solapa) return 'Ya registraste un avance que incluye alguna de estas lecciones.'
     if (!form.aprendizaje.trim()) return 'Contanos tu principal aprendizaje de la sesión.'
     return null
   }
@@ -256,15 +317,19 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
     setFormError(null)
     setSubmitting(true)
     try {
+      const ahora = new Date()
+      const horaFin = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
+      const leccionInicial = Number(form.leccionInicial)
+      const leccionFinal = Number(form.leccionFinal)
       await addDoc(collection(db, 'avances'), {
         userId,
         cursoId: selectedCursoId,
         fecha: form.fecha,
         horaInicio: form.horaInicio,
-        horaFin: form.horaFin,
-        lecciones: Number(form.lecciones),
-        leccionInicial: form.leccionInicial ? Number(form.leccionInicial) : null,
-        leccionFinal: form.leccionFinal ? Number(form.leccionFinal) : null,
+        horaFin,
+        lecciones: leccionFinal - leccionInicial + 1,
+        leccionInicial,
+        leccionFinal,
         aprendizaje: form.aprendizaje.trim(),
         comentario: form.comentario.trim() || null,
         creadoEn: serverTimestamp(),
@@ -341,18 +406,29 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Registrar avance</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Completa este formulario en menos de un minuto ·{' '}
-          <span className="text-red-500">*</span> campos obligatorios
-        </p>
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+          <CalendarClock className="h-5.5 w-5.5" />
+        </span>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Registrar avance</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Completa este formulario en menos de un minuto ·{' '}
+            <span className="text-red-500">*</span> campos obligatorios
+          </p>
+        </div>
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+        <div className="flex flex-col gap-3">
+          <div className="h-24 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+          <div className="h-48 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+        </div>
       ) : cursoIds.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">No tenés ningún curso asignado todavía.</p>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-gray-200 py-12 text-gray-400 dark:border-gray-800 dark:text-gray-500">
+          <Inbox className="h-8 w-8" />
+          <p className="text-sm">No tenés ningún curso asignado todavía.</p>
+        </div>
       ) : (
         <>
           {cursoIds.length > 1 && (
@@ -369,6 +445,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                 {opcionesCursos.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.nombre}
+                    {o.tipo ? ` · ${o.tipo}` : ''}
                     {o.proxima ? ` · próxima sesión ${formatFechaSesion(o.proxima)}` : ''}
                   </option>
                 ))}
@@ -405,7 +482,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                       type="date"
                       value={formEC.fecha}
                       onChange={(e) => setFormEC({ ...formEC, fecha: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                      className={dateTimeInputClass}
                     />
                   </div>
 
@@ -456,7 +533,8 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                   </button>
 
                   {guardado && (
-                    <p className="text-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    <p className="flex items-center justify-center gap-1.5 text-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
                       Avance guardado correctamente. Queda pendiente de confirmación por un administrador.
                     </p>
                   )}
@@ -465,119 +543,121 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
             </div>
           ) : (
             <>
-              <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-                <p className="mb-4 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                  Sesión más próxima programada
-                </p>
-                {sesionObjetivo ? (
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                        Curso
-                      </p>
-                      <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
-                        {sesionObjetivo.cursoNombre}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                        Horario
-                      </p>
-                      <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
-                        {formatHora(sesionObjetivo.hora)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                        Fecha
-                      </p>
-                      <p className="mt-1 font-semibold text-gray-900 dark:text-gray-100">
-                        {formatFechaSesion(sesionObjetivo.fecha)}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    No tenés ninguna sesión programada todavía.
+              {sesionObjetivo ? (
+                <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-400 p-6 text-white shadow-sm dark:from-indigo-500 dark:to-indigo-400">
+                  <p className="text-xs font-medium tracking-wide text-blue-100 uppercase dark:text-indigo-100">
+                    Sesión más próxima programada
                   </p>
-                )}
-              </div>
+                  <h2 className="mt-1 text-xl font-bold">{sesionObjetivo.cursoNombre}</h2>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-blue-50 dark:text-indigo-50">
+                    <Clock className="h-4 w-4" />
+                    {formatFechaSesion(sesionObjetivo.fecha)} · {formatHora(sesionObjetivo.hora)}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-gray-200 py-8 text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                  <Inbox className="h-7 w-7" />
+                  <p className="text-sm">No tenés ninguna sesión programada todavía.</p>
+                </div>
+              )}
 
               <form
                 onSubmit={handleSubmit}
                 className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
               >
                 <div>
-                  <p className="mb-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Confirma el día y horario de tu sesión <span className="text-red-500">*</span>
-                  </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <input
-                      type="date"
-                      value={form.fecha}
-                      onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
-                    <input
-                      type="time"
-                      value={form.horaInicio}
-                      onChange={(e) => setForm({ ...form, horaInicio: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
-                    <input
-                      type="time"
-                      value={form.horaFin}
-                      onChange={(e) => setForm({ ...form, horaFin: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Fecha <span className="font-normal text-gray-400 dark:text-gray-500">(automática)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={form.fecha}
+                        disabled
+                        className={`${dateTimeInputClass} disabled:opacity-70`}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Hora de inicio <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={form.horaInicio}
+                        onChange={(e) => setForm({ ...form, horaInicio: e.target.value })}
+                        className={dateTimeInputClass}
+                      />
+                    </div>
                   </div>
                   <p className="mt-2 text-xs text-gray-400 italic dark:text-gray-500">
-                    Ajusta el día u horario si tu sesión ocurrió en otro momento.
+                    La hora de finalización se registra automáticamente al guardar.
                   </p>
                 </div>
 
                 <hr className="border-gray-100 dark:border-gray-800" />
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                    ¿Cuántas lecciones avanzaste hoy? <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.lecciones}
-                    onChange={(e) => setForm({ ...form, lecciones: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  />
-                </div>
+                {rangosRegistrados.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-gray-400 dark:text-gray-500">Ya registradas:</span>
+                    {rangosRegistrados.map((r) => (
+                      <span
+                        key={`${r.leccionInicial}-${r.leccionFinal}`}
+                        className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                      >
+                        {r.leccionInicial === r.leccionFinal ? r.leccionInicial : `${r.leccionInicial}–${r.leccionFinal}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                      Lección inicial{' '}
-                      <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={form.leccionInicial}
-                      onChange={(e) => setForm({ ...form, leccionInicial: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
+                {leccionesInfo.total === 0 ? (
+                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                    Este curso no tiene sesiones configuradas todavía.
+                  </p>
+                ) : leccionesInfo.libres.length === 0 ? (
+                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                    Ya registraste todas las lecciones de este curso.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Lección inicial <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={form.leccionInicial}
+                        onChange={(e) => setForm({ ...form, leccionInicial: e.target.value, leccionFinal: '' })}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                      >
+                        <option value="">Selecciona...</option>
+                        {leccionesInfo.libres.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Lección final <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={form.leccionFinal}
+                        onChange={(e) => setForm({ ...form, leccionFinal: e.target.value })}
+                        disabled={!form.leccionInicial}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                      >
+                        <option value="">Selecciona...</option>
+                        {opcionesLeccionFinal.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                      Lección final <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={form.leccionFinal}
-                      onChange={(e) => setForm({ ...form, leccionFinal: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
-                  </div>
-                </div>
+                )}
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -626,7 +706,8 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                 </button>
 
                 {guardado && (
-                  <p className="text-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                  <p className="flex items-center justify-center gap-1.5 text-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4" />
                     Avance guardado correctamente.
                   </p>
                 )}

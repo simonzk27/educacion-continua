@@ -12,6 +12,7 @@ import {
   Check,
   TriangleAlert,
   ExternalLink,
+  Inbox,
 } from 'lucide-react'
 import {
   collection,
@@ -55,6 +56,12 @@ const estadoStyles: Record<Estado, string> = {
   Activo: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
   Inactivo: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
   Próximo: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+}
+
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).slice(0, 2)
+  const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
+  return letras || '?'
 }
 
 const estados: Estado[] = ['Activo', 'Inactivo', 'Próximo']
@@ -470,13 +477,16 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
         <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
           Buscar colaborador
         </label>
-        <input
-          type="text"
-          value={buscarTablero}
-          onChange={(e) => setBuscarTablero(e.target.value)}
-          placeholder="Nombre..."
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-        />
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={buscarTablero}
+            onChange={(e) => setBuscarTablero(e.target.value)}
+            placeholder="Nombre..."
+            className="rounded-lg border border-gray-300 py-2 pr-3 pl-8 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          />
+        </div>
       </div>
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -485,7 +495,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
         <select
           value={equipoFiltroTablero}
           onChange={(e) => setEquipoFiltroTablero(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
         >
           <option value="Todos">Todos</option>
           {equiposOpcionesTablero.map((eq) => (
@@ -500,7 +510,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
         <select
           value={estadoFiltroTablero}
           onChange={(e) => setEstadoFiltroTablero(e.target.value as typeof estadoFiltroTablero)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
         >
           <option value="Todos">Todos</option>
           <option value="Completado">Tiene algún curso completado</option>
@@ -515,7 +525,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
           setEquipoFiltroTablero('Todos')
           setEstadoFiltroTablero('Todos')
         }}
-        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+        className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
       >
         Limpiar
       </button>
@@ -534,7 +544,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
         <button
           type="button"
           onClick={openCreateModal}
-          className="flex w-fit items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          className="flex w-fit items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
         >
           <Plus className="h-4 w-4" />
           Nuevo curso
@@ -573,8 +583,8 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                 ))}
               </colgroup>
               <thead>
-                <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
-                  <th className="sticky left-0 z-10 relative bg-white px-5 py-3 font-semibold dark:bg-gray-900">
+                <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
+                  <th className="sticky left-0 z-10 relative bg-gray-50/60 px-5 py-3 font-semibold dark:bg-gray-950/40">
                     <span className="block truncate">Colaborador</span>
                     <span
                       onMouseDown={(e) => startColumnResize(e, 'colaborador', 180)}
@@ -606,20 +616,41 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {personasFiltradasTablero.length === 0 || cursos.length === 0 ? (
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={`tablero-skeleton-${i}`}>
+                      <td className="sticky left-0 z-10 bg-white px-5 py-3 dark:bg-gray-900">
+                        <div className="h-4 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="h-4 w-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                      </td>
+                      {cursos.map((c) => (
+                        <td key={c.id} className="px-3 py-3 text-center">
+                          <div className="mx-auto h-6 w-6 animate-pulse rounded-md bg-gray-100 dark:bg-gray-800" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : personasFiltradasTablero.length === 0 || cursos.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={2 + cursos.length}
-                      className="px-5 py-6 text-center text-gray-400 dark:text-gray-500"
-                    >
-                      No hay datos suficientes todavía.
+                    <td colSpan={2 + cursos.length} className="px-5 py-10">
+                      <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                        <Inbox className="h-8 w-8" />
+                        <p className="text-sm">No hay datos suficientes todavía.</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   personasFiltradasTablero.map((p) => (
-                    <tr key={p.id}>
-                      <td className="sticky left-0 z-10 bg-white px-5 py-3 font-semibold text-gray-900 dark:bg-gray-900 dark:text-gray-100">
-                        {p.nombre}
+                    <tr key={p.id} className="group transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
+                      <td className="sticky left-0 z-10 bg-white px-5 py-3 font-semibold text-gray-900 group-hover:bg-gray-50/80 dark:bg-gray-900 dark:text-gray-100 dark:group-hover:bg-gray-800/40">
+                        <span className="flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            {iniciales(p.nombre)}
+                          </span>
+                          <span className="truncate">{p.nombre}</span>
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{p.equipo ?? '–'}</td>
                       {cursos.map((c) => {
@@ -647,7 +678,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
 
                         const celda = (
                           <span
-                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold ${
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
                               confirmado
                                 ? 'bg-emerald-500 text-white'
                                 : pendienteConfirmar
@@ -655,7 +686,13 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                                   : 'bg-red-500 text-white'
                             }`}
                           >
-                            {confirmado ? '✓' : pendienteConfirmar ? '!' : '✕'}
+                            {confirmado ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : pendienteConfirmar ? (
+                              <TriangleAlert className="h-3.5 w-3.5" />
+                            ) : (
+                              <X className="h-3.5 w-3.5" />
+                            )}
                           </span>
                         )
 
@@ -682,7 +719,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                                   disabled={togglingKey === key}
                                   onClick={() => handleConfirmarCompletado(p.id, c.id)}
                                   title={tituloCelda}
-                                  className="disabled:opacity-50"
+                                  className="transition-transform hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
                                 >
                                   {celda}
                                 </button>
@@ -698,7 +735,10 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                                 className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
                                 title={`${pct}% completado`}
                               >
-                                <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                                <div
+                                  className={`h-full rounded-full transition-[width] ${barColor}`}
+                                  style={{ width: `${pct}%` }}
+                                />
                               </div>
                               <span className="text-[10px] text-gray-400 dark:text-gray-500">{pct}%</span>
                             </div>
@@ -718,7 +758,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
+              <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
                 <th className="px-5 py-3 font-semibold">Curso</th>
                 <th className="px-5 py-3 font-semibold">Tipo</th>
                 <th className="px-5 py-3 font-semibold">Categoría</th>
@@ -731,20 +771,44 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
-                    Cargando...
-                  </td>
-                </tr>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={`curso-skeleton-${i}`}>
+                    <td className="px-5 py-3">
+                      <div className="h-4 w-40 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="h-4 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="h-4 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="h-4 w-28 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="h-4 w-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="h-4 w-10 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="h-5 w-16 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                    <td className="px-5 py-3" />
+                  </tr>
+                ))
               ) : filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
-                    No hay cursos todavía.
+                  <td colSpan={8} className="px-5 py-10">
+                    <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                      <Inbox className="h-8 w-8" />
+                      <p className="text-sm">No hay cursos todavía.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 filtrados.map((c) => (
-                  <tr key={c.id}>
+                  <tr key={c.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                     <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
                       {c.link ? (
                         <a
@@ -762,7 +826,14 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                     </td>
                     <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipo}</td>
                     <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.categoria}</td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.instructor}</td>
+                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                          {iniciales(c.instructor)}
+                        </span>
+                        {c.instructor}
+                      </span>
+                    </td>
                     <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
                       {c.duracionValor} {c.duracionUnidad.toLowerCase()}
                     </td>
@@ -781,7 +852,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                           type="button"
                           onClick={() => openAssignModal(c)}
                           title="Asignar usuarios"
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                         >
                           <UserPlus className="h-4 w-4" />
                         </button>
@@ -789,7 +860,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                           type="button"
                           onClick={() => openEditModal(c)}
                           title="Editar curso"
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
@@ -797,7 +868,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                           type="button"
                           onClick={() => setDeleting(c)}
                           title="Eliminar curso"
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -814,21 +885,31 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                {editingId ? 'Editar curso' : 'Nuevo curso'}
-              </h2>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                  {editingId ? <Pencil className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                </span>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    {editingId ? 'Editar curso' : 'Nuevo curso'}
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {editingId ? 'Actualizá los datos del curso' : 'Completá los datos del nuevo curso'}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-5">
               <div>
                 <label htmlFor="nombre" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Nombre
@@ -838,7 +919,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   type="text"
                   value={form.nombre}
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
 
@@ -851,7 +932,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   type="text"
                   value={form.categoria}
                   onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
 
@@ -864,7 +945,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   type="text"
                   value={form.instructor}
                   onChange={(e) => setForm({ ...form, instructor: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
 
@@ -879,7 +960,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                     min="1"
                     value={form.duracionValor}
                     onChange={(e) => setForm({ ...form, duracionValor: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                 </div>
                 <div className="flex-1">
@@ -892,7 +973,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                     onChange={(e) =>
                       setForm({ ...form, duracionUnidad: e.target.value as DuracionUnidad })
                     }
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   >
                     {duracionUnidades.map((u) => (
                       <option key={u} value={u}>
@@ -911,7 +992,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   id="tipo"
                   value={form.tipo}
                   onChange={(e) => setForm({ ...form, tipo: e.target.value as Tipo })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 >
                   <option value="">Seleccionar...</option>
                   {tipos.map((t) => (
@@ -932,7 +1013,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   value={form.link}
                   onChange={(e) => setForm({ ...form, link: e.target.value })}
                   placeholder="https://..."
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
 
@@ -944,7 +1025,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   id="estado"
                   value={form.estado}
                   onChange={(e) => setForm({ ...form, estado: e.target.value as Estado })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 >
                   <option value="">Seleccionar...</option>
                   {estados.map((e) => (
@@ -955,20 +1036,25 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                 </select>
               </div>
 
-              {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
+              {formError && (
+                <p className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
+                  <TriangleAlert className="h-4 w-4 shrink-0" />
+                  {formError}
+                </p>
+              )}
 
               <div className="mt-2 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                 >
                   {submitting ? (editingId ? 'Guardando...' : 'Creando...') : editingId ? 'Guardar cambios' : 'Crear curso'}
                 </button>
@@ -980,22 +1066,27 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
 
       {assignCurso && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Asignar usuarios</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{assignCurso.nombre}</p>
+          <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                  <UserPlus className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Asignar usuarios</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{assignCurso.nombre}</p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={closeAssignModal}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 px-6 pt-5 sm:flex-row">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
@@ -1006,7 +1097,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                     setPage(1)
                   }}
                   placeholder="Buscar por nombre o correo..."
-                  className="w-full rounded-lg border border-gray-300 py-2 pr-3 pl-9 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  className="w-full rounded-lg border border-gray-300 py-2 pr-3 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
               <select
@@ -1015,7 +1106,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   setRolFiltro(e.target.value as RolFiltro)
                   setPage(1)
                 }}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               >
                 {rolFiltros.map((r) => (
                   <option key={r} value={r}>
@@ -1025,24 +1116,37 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
               </select>
             </div>
 
-            <div className="mt-4 flex-1 overflow-y-auto rounded-lg border border-gray-100 dark:border-gray-800">
+            <div
+              className={`mx-6 mt-4 flex-1 overflow-y-auto rounded-lg border border-gray-100 dark:border-gray-800 ${
+                totalPages > 1 ? '' : 'mb-6'
+              }`}
+            >
               {usuariosPagina.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
-                  No hay usuarios que coincidan.
-                </p>
+                <div className="flex flex-col items-center gap-2 px-4 py-8 text-gray-400 dark:text-gray-500">
+                  <Inbox className="h-7 w-7" />
+                  <p className="text-sm">No hay usuarios que coincidan.</p>
+                </div>
               ) : (
                 <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                   {usuariosPagina.map((u) => {
                     const asignado = assignedIds.has(u.id)
                     return (
-                      <li key={u.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {u.nombre}
-                          </p>
-                          <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                            {u.email} · {u.rol}
-                          </p>
+                      <li
+                        key={u.id}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40"
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            {iniciales(u.nombre)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {u.nombre}
+                            </p>
+                            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                              {u.email} · {u.rol}
+                            </p>
+                          </div>
                         </div>
                         <button
                           type="button"
@@ -1080,12 +1184,12 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
             </div>
 
             {totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+              <div className="mt-4 flex items-center justify-between px-6 pb-6 text-sm text-gray-500 dark:text-gray-400">
                 <button
                   type="button"
                   disabled={paginaActual <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-gray-800"
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 transition-colors hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-gray-800"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Anterior
@@ -1097,7 +1201,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                   type="button"
                   disabled={paginaActual >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-gray-800"
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 transition-colors hover:bg-gray-100 disabled:opacity-40 dark:hover:bg-gray-800"
                 >
                   Siguiente
                   <ChevronRight className="h-4 w-4" />
@@ -1132,7 +1236,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                 type="button"
                 onClick={() => setDeleting(null)}
                 disabled={deletingBusy}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
               >
                 Cancelar
               </button>
@@ -1140,7 +1244,7 @@ export default function ListadoCursos({ isAdmin }: ListadoCursosProps) {
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={deletingBusy}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-60"
               >
                 {deletingBusy ? 'Eliminando...' : 'Sí, eliminar por completo'}
               </button>

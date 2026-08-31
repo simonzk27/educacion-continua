@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert, KeyRound, Lock, LockOpen } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert, KeyRound, Lock, LockOpen, Inbox } from 'lucide-react'
 import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -52,6 +52,12 @@ const createErrorMessages: Record<string, string> = {
   'auth/email-already-in-use': 'Ese correo ya tiene una cuenta.',
   'auth/invalid-email': 'Correo inválido.',
   'auth/weak-password': 'La contraseña debe tener al menos 8 caracteres y un número.',
+}
+
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).slice(0, 2)
+  const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
+  return letras || '?'
 }
 
 const emptyForm = {
@@ -303,18 +309,18 @@ export default function Colaboradores() {
         <button
           type="button"
           onClick={openCreateModal}
-          className="flex w-fit items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          className="flex w-fit items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
         >
           <Plus className="h-4 w-4" />
           Nuevo colaborador
         </button>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
+              <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
                 <th className="px-5 py-3 font-semibold">Nombre</th>
                 <th className="px-5 py-3 font-semibold">Correo</th>
                 <th className="px-5 py-3 font-semibold">Rol</th>
@@ -326,15 +332,20 @@ export default function Colaboradores() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
-                    Cargando...
-                  </td>
-                </tr>
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={`skeleton-${i}`}>
+                    <td colSpan={7} className="px-5 py-4">
+                      <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                    </td>
+                  </tr>
+                ))
               ) : colaboradores.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
-                    No hay colaboradores todavía.
+                  <td colSpan={7} className="px-5 py-12">
+                    <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                      <Inbox className="h-8 w-8" />
+                      <p className="text-sm">No hay colaboradores todavía.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -342,9 +353,14 @@ export default function Colaboradores() {
                   const estado: Estado = c.activo ? 'Activo' : 'Inactivo'
                   const cursos = cursosPorColaborador[c.id]
                   return (
-                    <tr key={c.id}>
+                    <tr key={c.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                        {c.nombre}
+                        <span className="inline-flex items-center gap-2.5">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            {iniciales(c.nombre)}
+                          </span>
+                          {c.nombre}
+                        </span>
                       </td>
                       <td className="px-5 py-3 text-gray-400 dark:text-gray-500">{c.email}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.rol}</td>
@@ -366,7 +382,7 @@ export default function Colaboradores() {
                             type="button"
                             onClick={() => setResetting(c)}
                             title="Enviar restablecimiento de contraseña"
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                           >
                             <KeyRound className="h-4 w-4" />
                           </button>
@@ -379,7 +395,7 @@ export default function Colaboradores() {
                                 ? 'Deshabilitar cambio de contraseña propio'
                                 : 'Habilitar cambio de contraseña propio'
                             }
-                            className={`rounded-lg p-1.5 disabled:opacity-60 ${
+                            className={`rounded-lg p-1.5 transition-colors disabled:opacity-60 ${
                               c.puedeCambiarPassword
                                 ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
                                 : 'text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400'
@@ -395,7 +411,7 @@ export default function Colaboradores() {
                             type="button"
                             onClick={() => openEditModal(c)}
                             title="Editar colaborador"
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
@@ -403,7 +419,7 @@ export default function Colaboradores() {
                             type="button"
                             onClick={() => setDeleting(c)}
                             title="Eliminar colaborador"
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -419,22 +435,32 @@ export default function Colaboradores() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                {editingId ? 'Editar colaborador' : 'Nuevo colaborador'}
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                  {editingId ? <Pencil className="h-5.5 w-5.5" /> : <Plus className="h-5.5 w-5.5" />}
+                </span>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    {editingId ? 'Editar colaborador' : 'Nuevo colaborador'}
+                  </h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {editingId ? 'Actualizá los datos del colaborador.' : 'Completá los datos para crear una cuenta.'}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 px-6 py-5">
               <div>
                 <label htmlFor="nombre" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Nombre
@@ -541,14 +567,14 @@ export default function Colaboradores() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
                 >
                   {submitting ? (editingId ? 'Guardando...' : 'Creando...') : editingId ? 'Guardar cambios' : 'Crear colaborador'}
                 </button>
@@ -559,8 +585,8 @@ export default function Colaboradores() {
       )}
 
       {deleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
                 <TriangleAlert className="h-5.5 w-5.5" />
@@ -581,7 +607,7 @@ export default function Colaboradores() {
                 type="button"
                 onClick={() => setDeleting(null)}
                 disabled={deletingBusy}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
               >
                 Cancelar
               </button>
@@ -589,7 +615,7 @@ export default function Colaboradores() {
                 type="button"
                 onClick={handleDeleteConfirm}
                 disabled={deletingBusy}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-60"
               >
                 {deletingBusy ? 'Eliminando...' : 'Sí, eliminar por completo'}
               </button>
@@ -599,8 +625,8 @@ export default function Colaboradores() {
       )}
 
       {resetting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
                 <KeyRound className="h-5.5 w-5.5" />
@@ -621,7 +647,7 @@ export default function Colaboradores() {
                 type="button"
                 onClick={() => setResetting(null)}
                 disabled={resettingBusy}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
               >
                 Cancelar
               </button>
@@ -629,7 +655,7 @@ export default function Colaboradores() {
                 type="button"
                 onClick={handleResetConfirm}
                 disabled={resettingBusy}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
               >
                 {resettingBusy ? 'Enviando...' : 'Sí, enviar correo'}
               </button>

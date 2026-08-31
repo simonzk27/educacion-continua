@@ -1,8 +1,151 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronUp, ChevronDown, Clock, Flame, ListChecks, CircleDot } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Flame,
+  ListChecks,
+  CircleDot,
+  CalendarDays,
+  CheckCircle2,
+  AlarmClockCheck,
+  XCircle,
+  Gauge,
+  Inbox,
+} from 'lucide-react'
 import { collection, collectionGroup, onSnapshot, type Timestamp } from 'firebase/firestore'
 import { db } from './firebase'
-import { type Dia, type Modo, addDays, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
+import { type Dia, type Modo, addDays, dateToIso, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
+
+const diasCortos = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do']
+
+function addMonths(iso: string, delta: number): string {
+  const [y, m] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1 + delta, 1)
+  return dateToIso(dt)
+}
+
+function buildMonthGridFor(monthIso: string): (string | null)[] {
+  const [y, m] = monthIso.split('-').map(Number)
+  const first = new Date(y, m - 1, 1)
+  const daysInMonth = new Date(y, m, 0).getDate()
+  const startOffset = (first.getDay() + 6) % 7
+  const cells: (string | null)[] = new Array(startOffset).fill(null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(dateToIso(new Date(y, m - 1, d)))
+  }
+  return cells
+}
+
+type FechaCalendarioProps = {
+  readonly value: string
+  readonly onChange: (fecha: string) => void
+  readonly disabled?: boolean
+}
+
+function FechaCalendario({ value, onChange, disabled }: FechaCalendarioProps) {
+  const [abierto, setAbierto] = useState(false)
+  const [mesVista, setMesVista] = useState(`${value.slice(0, 7)}-01`)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!abierto) return
+    function onClickFuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false)
+    }
+    document.addEventListener('mousedown', onClickFuera)
+    return () => document.removeEventListener('mousedown', onClickFuera)
+  }, [abierto])
+
+  function abrir() {
+    setMesVista(`${value.slice(0, 7)}-01`)
+    setAbierto(true)
+  }
+
+  const grid = useMemo(() => buildMonthGridFor(mesVista), [mesVista])
+  const mesLabel = new Date(`${mesVista}T00:00:00`).toLocaleDateString('es-CO', {
+    month: 'long',
+    year: 'numeric',
+  })
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => (abierto ? setAbierto(false) : abrir())}
+        className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+      >
+        <CalendarDays className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+        {formatFechaCorta(value)}
+      </button>
+
+      {abierto && (
+        <div className="absolute top-full left-0 z-20 mt-1.5 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex items-center justify-between bg-gradient-to-br from-blue-500 to-blue-400 px-3 py-2.5 text-white dark:from-indigo-500 dark:to-indigo-400">
+            <button
+              type="button"
+              onClick={() => setMesVista((m) => addMonths(m, -1))}
+              disabled={mesVista <= `${todayIso().slice(0, 7)}-01`}
+              className="rounded-lg p-1 hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-bold capitalize">{mesLabel}</span>
+            <button
+              type="button"
+              onClick={() => setMesVista((m) => addMonths(m, 1))}
+              className="rounded-lg p-1 hover:bg-white/20"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="p-3">
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+              {diasCortos.map((d) => (
+                <span key={d}>{d}</span>
+              ))}
+            </div>
+            <div className="mt-1.5 grid grid-cols-7 gap-1">
+              {grid.map((fecha, i) => {
+                if (!fecha) return <span key={`pad-${i}`} />
+                const habilitado = fecha >= todayIso()
+                const activo = fecha === value
+                const esHoy = fecha === todayIso()
+                const dayNum = Number(fecha.split('-')[2])
+                return (
+                  <button
+                    key={fecha}
+                    type="button"
+                    disabled={!habilitado}
+                    onClick={() => {
+                      onChange(fecha)
+                      setAbierto(false)
+                    }}
+                    className={`relative flex aspect-square items-center justify-center rounded-full text-sm font-medium transition-all ${
+                      activo
+                        ? 'scale-105 bg-blue-600 text-white shadow-md shadow-blue-600/30 dark:bg-indigo-500 dark:shadow-indigo-500/30'
+                        : habilitado
+                          ? 'text-gray-700 hover:scale-105 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
+                          : 'text-gray-300 dark:text-gray-700'
+                    }`}
+                  >
+                    {dayNum}
+                    {esHoy && !activo && (
+                      <span className="absolute bottom-1 h-1 w-1 rounded-full bg-blue-500 dark:bg-indigo-400" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 type Estado = 'Reportó' | 'Pendiente' | 'No reportó'
 type Tab = 'general' | 'diario'
@@ -96,6 +239,12 @@ function horaAMin(hora: string): number {
 
 function finDeAnioIso(): string {
   return `${new Date().getFullYear()}-12-31`
+}
+
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).slice(0, 2)
+  const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
+  return letras || '?'
 }
 
 function formatFechaCorta(iso: string): string {
@@ -337,25 +486,40 @@ export default function Dashboard() {
       {tab === 'general' ? (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{programadas}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Programadas</p>
+            <div className="group rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+              <div className="mb-2 flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+                <CalendarDays className="h-4 w-4" />
+                <p className="text-xs font-medium tracking-wide">Programadas</p>
+              </div>
+              <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{programadas}</p>
             </div>
-            <div className="rounded-2xl bg-emerald-50 p-5 dark:bg-emerald-500/10">
-              <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{reportaron}</p>
-              <p className="text-sm text-emerald-700/80 dark:text-emerald-400/80">Reportaron</p>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 transition-shadow hover:shadow-md dark:border-emerald-500/10 dark:bg-emerald-500/10">
+              <div className="mb-2 flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <p className="text-xs font-medium tracking-wide">Reportaron</p>
+              </div>
+              <p className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{reportaron}</p>
             </div>
-            <div className="rounded-2xl bg-amber-50 p-5 dark:bg-amber-500/10">
-              <p className="text-3xl font-bold text-amber-700 dark:text-amber-400">{pendientes}</p>
-              <p className="text-sm text-amber-700/80 dark:text-amber-400/80">Pendientes</p>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5 transition-shadow hover:shadow-md dark:border-amber-500/10 dark:bg-amber-500/10">
+              <div className="mb-2 flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <AlarmClockCheck className="h-4 w-4" />
+                <p className="text-xs font-medium tracking-wide">Pendientes</p>
+              </div>
+              <p className="text-3xl font-bold tabular-nums text-amber-700 dark:text-amber-400">{pendientes}</p>
             </div>
-            <div className="rounded-2xl bg-red-50 p-5 dark:bg-red-500/10">
-              <p className="text-3xl font-bold text-red-700 dark:text-red-400">{noReportaron}</p>
-              <p className="text-sm text-red-700/80 dark:text-red-400/80">No reportaron</p>
+            <div className="rounded-2xl border border-red-100 bg-red-50 p-5 transition-shadow hover:shadow-md dark:border-red-500/10 dark:bg-red-500/10">
+              <div className="mb-2 flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                <XCircle className="h-4 w-4" />
+                <p className="text-xs font-medium tracking-wide">No reportaron</p>
+              </div>
+              <p className="text-3xl font-bold tabular-nums text-red-700 dark:text-red-400">{noReportaron}</p>
             </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{porcentaje}%</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Porcentaje de reporte</p>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 transition-shadow hover:shadow-md dark:border-indigo-500/20 dark:bg-indigo-500/10">
+              <div className="mb-2 flex items-center gap-1.5 text-blue-600 dark:text-indigo-400">
+                <Gauge className="h-4 w-4" />
+                <p className="text-xs font-medium tracking-wide">Porcentaje de reporte</p>
+              </div>
+              <p className="text-3xl font-bold tabular-nums text-blue-700 dark:text-indigo-300">{porcentaje}%</p>
             </div>
           </div>
 
@@ -366,13 +530,10 @@ export default function Dashboard() {
                   Fecha
                 </label>
                 <div className="flex items-stretch gap-1.5">
-                  <input
-                    type="date"
+                  <FechaCalendario
                     value={fecha}
-                    min={todayIso()}
                     disabled={verAnio}
-                    onChange={(e) => setFecha(e.target.value < todayIso() ? todayIso() : e.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    onChange={(f) => setFecha(f < todayIso() ? todayIso() : f)}
                   />
                   <div className="flex flex-col overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700">
                     <button
@@ -455,11 +616,11 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
+                  <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
                     <th className="px-5 py-3 font-semibold">Colaborador</th>
                     <th className="px-5 py-3 font-semibold">Equipo</th>
                     <th className="px-5 py-3 font-semibold">Curso</th>
@@ -473,24 +634,34 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {loading ? (
-                    <tr>
-                      <td colSpan={verAnio ? 9 : 8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
-                        Cargando...
-                      </td>
-                    </tr>
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <tr key={`skeleton-${i}`}>
+                        <td colSpan={verAnio ? 9 : 8} className="px-5 py-4">
+                          <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                        </td>
+                      </tr>
+                    ))
                   ) : filtradas.length === 0 ? (
                     <tr>
-                      <td colSpan={verAnio ? 9 : 8} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
-                        {verAnio
-                          ? 'No hay sesiones programadas de hoy en adelante.'
-                          : 'No hay sesiones programadas para esta fecha.'}
+                      <td colSpan={verAnio ? 9 : 8} className="px-5 py-12">
+                        <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                          <Inbox className="h-8 w-8" />
+                          <p className="text-sm">
+                            {verAnio
+                              ? 'No hay sesiones programadas de hoy en adelante.'
+                              : 'No hay sesiones programadas para esta fecha.'}
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
                     filtradas.map((f) => (
-                      <tr key={f.key}>
+                      <tr key={f.key} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                         <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                          <span className="inline-flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-2.5">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                              {iniciales(f.colaborador)}
+                            </span>
                             {f.colaborador}
                             {(cantidadCursosPorUsuario[f.userId] ?? 0) > 1 && (
                               <span
@@ -540,28 +711,28 @@ export default function Dashboard() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
               <div className="mb-1 flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
                 <ListChecks className="h-4 w-4" />
                 <p className="text-xs font-medium uppercase tracking-wide">Sesiones hoy</p>
               </div>
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{filasHoy.length}</p>
+              <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{filasHoy.length}</p>
             </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 dark:border-indigo-500/20 dark:bg-indigo-500/10">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5 transition-shadow hover:shadow-md dark:border-indigo-500/20 dark:bg-indigo-500/10">
               <div className="mb-1 flex items-center gap-1.5 text-blue-500 dark:text-indigo-400">
                 <CircleDot className="h-4 w-4" />
                 <p className="text-xs font-medium uppercase tracking-wide">En curso ahora</p>
               </div>
-              <p className="text-3xl font-bold text-blue-700 dark:text-indigo-300">{enCurso}</p>
+              <p className="text-3xl font-bold tabular-nums text-blue-700 dark:text-indigo-300">{enCurso}</p>
             </div>
-            <div className="rounded-2xl bg-emerald-50 p-5 dark:bg-emerald-500/10">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 transition-shadow hover:shadow-md dark:border-emerald-500/10 dark:bg-emerald-500/10">
               <div className="mb-1 flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                 <ListChecks className="h-4 w-4" />
                 <p className="text-xs font-medium uppercase tracking-wide">Completadas</p>
               </div>
-              <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">{completadasHoy}</p>
+              <p className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{completadasHoy}</p>
             </div>
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
               <div className="mb-1 flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
                   <Flame className="h-4 w-4" />
@@ -571,12 +742,16 @@ export default function Dashboard() {
                   Prueba
                 </span>
               </div>
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{RACHA_PRUEBA_DIAS} días</p>
+              <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{RACHA_PRUEBA_DIAS} días</p>
             </div>
           </div>
 
           {loading ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={`skeleton-${i}`} className="h-16 animate-pulse rounded-2xl bg-gray-100 dark:bg-gray-800" />
+              ))}
+            </div>
           ) : (
             <>
               {proxima && (
@@ -594,15 +769,21 @@ export default function Dashboard() {
                   Línea de tiempo de hoy
                 </h2>
                 {filasHoy.length === 0 ? (
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    No hay sesiones programadas para hoy.
-                  </p>
+                  <div className="flex flex-col items-center gap-2 py-6 text-gray-400 dark:text-gray-500">
+                    <Inbox className="h-8 w-8" />
+                    <p className="text-sm">No hay sesiones programadas para hoy.</p>
+                  </div>
                 ) : (
                   <ul className="flex flex-col gap-4">
                     {filasHoy.map((f) => (
-                      <li key={f.key} className="flex gap-3">
+                      <li
+                        key={f.key}
+                        className="-mx-2 flex gap-3 rounded-xl px-2 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40"
+                      >
                         <div className="flex flex-col items-center">
-                          <span className={`h-2.5 w-2.5 rounded-full ${railStyles[f.estado]}`} />
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ring-4 ring-white dark:ring-gray-900 ${railStyles[f.estado]}`}
+                          />
                           <span className="w-px flex-1 bg-gray-200 dark:bg-gray-800" />
                         </div>
                         <div className="flex flex-1 flex-wrap items-center justify-between gap-2 pb-4">

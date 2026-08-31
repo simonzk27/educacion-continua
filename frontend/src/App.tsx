@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 import Login from './Login'
 import Sidebar from './Sidebar'
@@ -24,7 +25,8 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-gray-50 dark:bg-gray-950">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gray-50 dark:bg-gray-950">
+        <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-indigo-400" />
         <p className="text-sm text-gray-500 dark:text-gray-400">Cargando...</p>
       </div>
     )

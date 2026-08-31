@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Settings2, X, CheckCircle2, CalendarClock, Clock, Timer, CalendarRange } from 'lucide-react'
+import {
+  Settings2,
+  X,
+  CheckCircle2,
+  CalendarClock,
+  Clock,
+  Timer,
+  CalendarRange,
+  Inbox,
+  BookOpen,
+  CalendarDays,
+} from 'lucide-react'
 import { collection, collectionGroup, doc, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
+import { addDays, ocurrenciasEntre, formatFechaSesion } from './scheduleUtils'
 
 type Equipo = 'Educación Continua' | 'Unimetab' | 'Academia'
 type Estado = 'Activo' | 'Inactivo'
@@ -80,6 +92,12 @@ function formatHora(hora: string | null): string {
   return `${h12}:${mStr} ${suffix}`
 }
 
+function iniciales(nombre: string): string {
+  const partes = nombre.trim().split(/\s+/).slice(0, 2)
+  const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
+  return letras || '?'
+}
+
 function formatFecha(fecha: string): string {
   const [y, m, d] = fecha.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('es-CO', {
@@ -138,6 +156,7 @@ const emptyForm = {
 export default function Horarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [cursoNombres, setCursoNombres] = useState<Record<string, string>>({})
+  const [cursosPorId, setCursosPorId] = useState<Record<string, { nombre: string; duracionValor: number }>>({})
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([])
   const [horarios, setHorarios] = useState<Record<string, Horario>>({})
   const [loadingUsuarios, setLoadingUsuarios] = useState(true)
@@ -149,6 +168,9 @@ export default function Horarios() {
   const [colaborador, setColaborador] = useState('Todos')
   const [curso, setCurso] = useState('Todos')
   const [estado, setEstado] = useState('Todos')
+
+  const [vista, setVista] = useState<'tabla' | 'colaborador'>('tabla')
+  const [colaboradorVistaId, setColaboradorVistaId] = useState<string | null>(null)
 
   const [editing, setEditing] = useState<Fila | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -187,10 +209,15 @@ export default function Horarios() {
       collection(db, 'cursos'),
       (snap) => {
         const map: Record<string, string> = {}
+        const infoMap: Record<string, { nombre: string; duracionValor: number }> = {}
         snap.docs.forEach((d) => {
-          map[d.id] = (d.data().nombre as string) ?? d.id
+          const data = d.data()
+          const nombre = (data.nombre as string) ?? d.id
+          map[d.id] = nombre
+          infoMap[d.id] = { nombre, duracionValor: (data.duracionValor as number) ?? 0 }
         })
         setCursoNombres(map)
+        setCursosPorId(infoMap)
         setLoadingCursos(false)
       },
       (err) => {
@@ -314,6 +341,55 @@ export default function Horarios() {
     return matchEquipo && matchColaborador && matchCurso && matchEstado
   })
 
+  useEffect(() => {
+    if (vista !== 'colaborador') return
+    if (colaboradorVistaId && usuariosPorId[colaboradorVistaId]) return
+    setColaboradorVistaId(usuarios[0]?.id ?? null)
+  }, [vista, colaboradorVistaId, usuarios, usuariosPorId])
+
+  const cursosColaboradorVista = useMemo(() => {
+    if (!colaboradorVistaId) return []
+    const hoy = todayIso()
+    const ventana = addDays(hoy, 180)
+    return filas
+      .filter((f) => f.userId === colaboradorVistaId)
+      .map((f) => {
+        const duracionValor = cursosPorId[f.cursoId]?.duracionValor ?? 0
+        const tieneHorario = f.dias.length > 0 || f.fechas.length > 0
+        let progreso: number | null = null
+        let proxima: { fecha: string; hora: string } | null = null
+        if (tieneHorario && f.hora) {
+          const completadas = ocurrenciasEntre(
+            { modo: f.modo, dias: f.dias, fechas: f.fechas, hora: f.hora, vigenciaInicio: f.vigenciaInicio, vigenciaFin: f.vigenciaFin },
+            '0001-01-01',
+            hoy,
+          ).length
+          const total = duracionValor > 0 ? duracionValor : 1
+          progreso = Math.min(100, Math.round((completadas / total) * 100))
+          const siguiente = ocurrenciasEntre(
+            { modo: f.modo, dias: f.dias, fechas: f.fechas, hora: f.hora, vigenciaInicio: f.vigenciaInicio, vigenciaFin: f.vigenciaFin },
+            hoy,
+            ventana,
+          )[0]
+          if (siguiente) proxima = { fecha: siguiente, hora: f.hora }
+        }
+        const estadoCurso =
+          progreso === null ? 'Sin horario asignado' : progreso >= 100 ? 'Completado' : 'En progreso'
+        return {
+          cursoId: f.cursoId,
+          curso: f.curso,
+          modo: f.modo,
+          dias: f.dias,
+          fechas: f.fechas,
+          hora: f.hora,
+          progreso,
+          proxima,
+          estadoCurso,
+        }
+      })
+      .sort((a, b) => a.curso.localeCompare(b.curso))
+  }, [colaboradorVistaId, filas, cursosPorId])
+
   function openEditModal(f: Fila) {
     setEditing(f)
     const horas = f.duracionMin ? Math.floor(f.duracionMin / 60) : 0
@@ -410,8 +486,34 @@ export default function Horarios() {
             momento
           </p>
         </div>
+        <div className="flex shrink-0 overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700">
+          <button
+            type="button"
+            onClick={() => setVista('tabla')}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition ${
+              vista === 'tabla'
+                ? 'bg-blue-600 text-white dark:bg-indigo-500'
+                : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'
+            }`}
+          >
+            Tabla
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista('colaborador')}
+            className={`flex items-center gap-1.5 border-l border-gray-300 px-3 py-2 text-sm font-medium transition dark:border-gray-700 ${
+              vista === 'colaborador'
+                ? 'bg-blue-600 text-white dark:bg-indigo-500'
+                : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'
+            }`}
+          >
+            Por colaborador
+          </button>
+        </div>
       </div>
 
+      {vista === 'tabla' ? (
+      <>
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex flex-wrap items-end gap-4">
           <div>
@@ -557,6 +659,137 @@ export default function Horarios() {
           </table>
         </div>
       </div>
+      </>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+            <p className="mb-2 px-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+              Colaboradores
+            </p>
+            <div className="flex max-h-[520px] flex-col gap-0.5 overflow-y-auto">
+              {usuarios.map((u) => {
+                const activo = u.id === colaboradorVistaId
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setColaboradorVistaId(u.id)}
+                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition-colors ${
+                      activo
+                        ? 'bg-blue-50 text-blue-700 dark:bg-indigo-500/10 dark:text-indigo-300'
+                        : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800/60'
+                    }`}
+                  >
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        activo
+                          ? 'bg-blue-600 text-white dark:bg-indigo-500'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                      }`}
+                    >
+                      {iniciales(u.nombre)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{u.nombre}</span>
+                      {u.equipo && (
+                        <span className="block truncate text-xs text-gray-400 dark:text-gray-500">{u.equipo}</span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white dark:bg-indigo-500">
+                {iniciales(usuariosPorId[colaboradorVistaId ?? '']?.nombre ?? '?')}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {usuariosPorId[colaboradorVistaId ?? '']?.nombre ?? 'Selecciona un colaborador'}
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  {cursosColaboradorVista.length} curso{cursosColaboradorVista.length === 1 ? '' : 's'} asignado
+                  {cursosColaboradorVista.length === 1 ? '' : 's'}
+                </p>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex flex-col gap-3">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <div key={`skeleton-${i}`} className="h-20 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800" />
+                ))}
+              </div>
+            ) : cursosColaboradorVista.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-10 text-gray-400 dark:text-gray-500">
+                <Inbox className="h-8 w-8" />
+                <p className="text-sm">No tiene cursos asignados.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {cursosColaboradorVista.map((c) => (
+                  <div
+                    key={c.cursoId}
+                    className="rounded-xl border border-gray-100 p-4 transition-shadow hover:shadow-sm dark:border-gray-800"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                          <BookOpen className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="font-semibold text-gray-900 dark:text-gray-100">{c.curso}</p>
+                          <p
+                            className={`text-xs font-medium ${
+                              c.estadoCurso === 'Completado'
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : c.estadoCurso === 'En progreso'
+                                  ? 'text-blue-600 dark:text-indigo-400'
+                                  : 'text-gray-400 dark:text-gray-500'
+                            }`}
+                          >
+                            {c.estadoCurso}
+                          </p>
+                        </div>
+                      </div>
+                      {c.progreso !== null && (
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                          {c.progreso}%
+                        </span>
+                      )}
+                    </div>
+                    {c.progreso !== null && (
+                      <div className="mt-3 h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800">
+                        <div
+                          className="h-1.5 rounded-full bg-blue-500 transition-[width] dark:bg-indigo-500"
+                          style={{ width: `${c.progreso}%` }}
+                        />
+                      </div>
+                    )}
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      {c.modo === 'mensual' && c.fechas.length > 0
+                        ? c.fechas.map((fecha) => formatFechaCorta(fecha)).join(', ')
+                        : c.dias.length > 0
+                          ? c.dias.join(', ')
+                          : 'Sin horario asignado'}
+                      {c.hora ? ` · ${formatHora(c.hora)}` : ''}
+                    </p>
+                    {c.proxima && (
+                      <p className="mt-1.5 text-xs font-medium text-blue-600 dark:text-indigo-400">
+                        Próxima sesión: {formatFechaSesion(c.proxima.fecha)} · {formatHora(c.proxima.hora)}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
@@ -597,43 +830,51 @@ export default function Horarios() {
               </label>
 
               {form.programarMes ? (
-                <div>
-                  <span className="mb-2 flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300">
-                    <span className="capitalize">{mesLabel}</span>
-                    <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
-                      {form.fechas.length} fecha{form.fechas.length === 1 ? '' : 's'} elegida
-                      {form.fechas.length === 1 ? '' : 's'}
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                  <div className="flex items-center justify-between bg-gradient-to-br from-blue-500 to-blue-400 px-4 py-3 text-white dark:from-indigo-500 dark:to-indigo-400">
+                    <span className="flex items-center gap-2 text-sm font-bold capitalize">
+                      <CalendarDays className="h-4 w-4" />
+                      {mesLabel}
                     </span>
-                  </span>
-                  <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-gray-400 dark:text-gray-500">
-                    {dias.map((d) => (
-                      <span key={d}>{diaCorto[d]}</span>
-                    ))}
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold backdrop-blur-sm">
+                      {form.fechas.length} fecha{form.fechas.length === 1 ? '' : 's'}
+                    </span>
                   </div>
-                  <div className="mt-1 grid grid-cols-7 gap-1">
-                    {monthGrid.map((fecha, i) => {
-                      if (!fecha) return <span key={`pad-${i}`} />
-                      const habilitado = fecha >= todayIso()
-                      const activo = form.fechas.includes(fecha)
-                      const dayNum = Number(fecha.split('-')[2])
-                      return (
-                        <button
-                          key={fecha}
-                          type="button"
-                          disabled={!habilitado}
-                          onClick={() => toggleFecha(fecha)}
-                          className={`flex aspect-square items-center justify-center rounded-lg text-sm font-medium transition ${
-                            activo
-                              ? 'bg-blue-600 text-white shadow-sm dark:bg-indigo-500'
-                              : habilitado
-                                ? 'text-gray-700 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
-                                : 'text-gray-300 dark:text-gray-700'
-                          }`}
-                        >
-                          {dayNum}
-                        </button>
-                      )
-                    })}
+                  <div className="p-3.5">
+                    <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                      {dias.map((d) => (
+                        <span key={d}>{diaCorto[d]}</span>
+                      ))}
+                    </div>
+                    <div className="mt-2 grid grid-cols-7 gap-1">
+                      {monthGrid.map((fecha, i) => {
+                        if (!fecha) return <span key={`pad-${i}`} />
+                        const habilitado = fecha >= todayIso()
+                        const activo = form.fechas.includes(fecha)
+                        const esHoy = fecha === todayIso()
+                        const dayNum = Number(fecha.split('-')[2])
+                        return (
+                          <button
+                            key={fecha}
+                            type="button"
+                            disabled={!habilitado}
+                            onClick={() => toggleFecha(fecha)}
+                            className={`relative flex aspect-square items-center justify-center rounded-full text-sm font-medium transition-all ${
+                              activo
+                                ? 'scale-105 bg-blue-600 text-white shadow-md shadow-blue-600/30 dark:bg-indigo-500 dark:shadow-indigo-500/30'
+                                : habilitado
+                                  ? 'text-gray-700 hover:scale-105 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
+                                  : 'text-gray-300 dark:text-gray-700'
+                            }`}
+                          >
+                            {dayNum}
+                            {esHoy && !activo && (
+                              <span className="absolute bottom-1 h-1 w-1 rounded-full bg-blue-500 dark:bg-indigo-400" />
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -678,7 +919,7 @@ export default function Horarios() {
                     type="time"
                     value={form.hora}
                     onChange={(e) => setForm({ ...form, hora: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:[color-scheme:dark]"
                   />
                 </div>
                 <div>
