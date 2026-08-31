@@ -96,7 +96,7 @@ async function enviarCorreo({ to, nombre, curso, fecha, hora, minutosAntes }) {
       subject: `Recordatorio: tu sesión de "${curso}" empieza en ${cuandoTexto}`,
       html: `
         <p>Hola ${nombre},</p>
-        <p>Este es un recordatorio de que tenés una sesión programada:</p>
+        <p>Este es un recordatorio de que tienes una sesión programada:</p>
         <ul>
           <li><strong>Curso:</strong> ${curso}</li>
           <li><strong>Fecha:</strong> ${formatFechaLarga(fecha)}</li>
