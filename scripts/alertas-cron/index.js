@@ -1,7 +1,7 @@
 const admin = require('firebase-admin')
 
 const BOGOTA_OFFSET_MS = 5 * 60 * 60 * 1000
-const CATCH_UP_WINDOW_MS = 35 * 60 * 1000 
+const CATCH_UP_WINDOW_MS = 35 * 60 * 1000
 
 const DIA_INDEX = {
   Lunes: 0,
@@ -170,9 +170,9 @@ async function main() {
       const sessionUtcMs = bogotaDateTimeToUtcMs(fecha, h.hora)
       const alertUtcMs = sessionUtcMs - minutosAntes * 60 * 1000
 
-      if (nowMs < alertUtcMs) continue 
-      if (nowMs > sessionUtcMs) continue 
-      if (nowMs - alertUtcMs > CATCH_UP_WINDOW_MS) continue 
+      if (nowMs < alertUtcMs) continue
+      if (nowMs > sessionUtcMs) continue
+      if (nowMs - alertUtcMs > CATCH_UP_WINDOW_MS) continue
 
       const dedupeKey = `${horarioDoc.id}_${fecha}`
       const dedupeRef = db.collection('alertasEnviadas').doc(dedupeKey)
@@ -185,7 +185,7 @@ async function main() {
         })
       } catch {
         omitidos++
-        continue 
+        continue
       }
 
       try {
@@ -201,7 +201,7 @@ async function main() {
         console.log(`Enviado a ${user.email} — ${curso.nombre} ${fecha} ${h.hora}`)
       } catch (err) {
         console.error(`Error enviando a ${user.email}:`, err.message)
-        await dedupeRef.delete().catch(() => {})
+        await dedupeRef.delete().catch(() => { })
       }
     }
   }
