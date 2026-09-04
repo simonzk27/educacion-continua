@@ -246,7 +246,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="overflow-x-auto">
+        <div className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[800px] table-fixed text-left text-sm">
             <colgroup>
               <col style={{ width: colWidths.colaborador ?? 180 }} />
@@ -257,7 +257,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
             </colgroup>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
-                <th className="sticky left-0 z-10 relative bg-gray-50/60 px-5 py-3 font-semibold dark:bg-gray-950/40">
+                <th className="sticky top-0 left-0 z-30 bg-gray-50/60 px-5 py-3 font-semibold dark:bg-gray-950/40">
                   <span className="block truncate">Colaborador</span>
                   <span
                     onMouseDown={(e) => startColumnResize(e, 'colaborador', 180)}
@@ -267,7 +267,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
                     className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-400/50 active:bg-blue-500/60 dark:hover:bg-indigo-400/50"
                   />
                 </th>
-                <th className="relative px-5 py-3 font-semibold">
+                <th className="sticky top-0 z-20 bg-gray-50/60 px-5 py-3 font-semibold dark:bg-gray-950/40">
                   <span className="block truncate">Equipo</span>
                   <span
                     onMouseDown={(e) => startColumnResize(e, 'equipo', 150)}
@@ -278,7 +278,10 @@ export default function Tablero({ isAdmin }: TableroProps) {
                   />
                 </th>
                 {cursosVisibles.map((c) => (
-                  <th key={c.id} className="relative px-3 py-3 text-center font-semibold">
+                  <th
+                    key={c.id}
+                    className="sticky top-0 z-20 bg-gray-50/60 px-3 py-3 text-center font-semibold dark:bg-gray-950/40"
+                  >
                     <span className="block truncate">{c.nombre}</span>
                     <span
                       onMouseDown={(e) => startColumnResize(e, c.id, 130)}

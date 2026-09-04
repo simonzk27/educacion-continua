@@ -12,7 +12,7 @@ import {
   Inbox,
 } from 'lucide-react'
 import { collection, collectionGroup, onSnapshot, type Timestamp } from 'firebase/firestore'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { db } from './firebase'
 import { type Dia, type Modo, addDays, dateToIso, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
 import Tablero from './Tablero'
@@ -31,6 +31,7 @@ type Usuario = {
 type Curso = {
   id: string
   nombre: string
+  tipo: string
 }
 
 type Inscripcion = {
@@ -176,7 +177,8 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
     return onSnapshot(collection(db, 'cursos'), (snap) => {
       const map: Record<string, Curso> = {}
       snap.docs.forEach((d) => {
-        map[d.id] = { id: d.id, nombre: (d.data().nombre as string) ?? d.id }
+        const data = d.data()
+        map[d.id] = { id: d.id, nombre: (data.nombre as string) ?? d.id, tipo: (data.tipo as string) ?? '' }
       })
       setCursosPorId(map)
     })
@@ -321,21 +323,25 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
   const leccionesPorSemana = useMemo(() => {
     const semanaActualInicio = inicioSemanaLunes(todayIso())
     const semanas = Array.from({ length: 8 }, (_, i) => addDays(semanaActualInicio, -7 * (7 - i)))
-    const totales: Record<string, number> = {}
+    const totales: Record<string, Record<string, number>> = {}
     semanas.forEach((s) => {
-      totales[s] = 0
+      totales[s] = { 'Educación Continua': 0, Unimetab: 0, Academia: 0 }
     })
     avances.forEach((a) => {
       if (!a.fecha) return
       const semana = inicioSemanaLunes(a.fecha)
-      if (semana in totales) totales[semana] += a.lecciones
+      if (!(semana in totales)) return
+      const tipo = cursosPorId[a.cursoId]?.tipo
+      if (tipo === 'Educación Continua' || tipo === 'Unimetab' || tipo === 'Academia') {
+        totales[semana][tipo] += a.lecciones
+      }
     })
     return semanas.map((s) => ({
       semana: s,
       label: formatFechaCorta(s),
-      lecciones: totales[s],
+      ...totales[s],
     }))
-  }, [avances])
+  }, [avances, cursosPorId])
 
   const filasHoy = useMemo(
     () => filasEnRango(todayIso(), todayIso()),
@@ -449,7 +455,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Lecciones registradas por semana · últimas 8 semanas
+              Lecciones por semana y tipo de curso · últimas 8 semanas
             </h2>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -472,9 +478,11 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                       color: isDark ? '#f3f4f6' : '#111827',
                     }}
                     labelFormatter={(label) => `Semana del ${label}`}
-                    formatter={(value) => [value, 'Lecciones']}
                   />
-                  <Bar dataKey="lecciones" fill={isDark ? '#6366f1' : '#2563eb'} radius={[6, 6, 0, 0]} maxBarSize={40} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: axisColor }} />
+                  <Bar dataKey="Educación Continua" stackId="lecciones" fill="#2563eb" />
+                  <Bar dataKey="Unimetab" stackId="lecciones" fill="#f59e0b" />
+                  <Bar dataKey="Academia" stackId="lecciones" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

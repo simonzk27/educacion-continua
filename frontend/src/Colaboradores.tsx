@@ -89,6 +89,7 @@ export default function Colaboradores() {
   const [resetting, setResetting] = useState<Colaborador | null>(null)
   const [resettingBusy, setResettingBusy] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [cursosExpandidos, setCursosExpandidos] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('nombre'))
@@ -139,11 +140,20 @@ export default function Colaboradores() {
   const cursosPorColaborador = useMemo(() => {
     const map: Record<string, string[]> = {}
     inscripciones.forEach(({ userId, cursoId }) => {
-      const nombre = cursoNombres[cursoId] ?? cursoId
+      const nombre = (cursoNombres[cursoId] ?? cursoId).toLowerCase()
       map[userId] = [...(map[userId] ?? []), nombre]
     })
     return map
   }, [inscripciones, cursoNombres])
+
+  function toggleCursosExpandido(colaboradorId: string) {
+    setCursosExpandidos((prev) => {
+      const next = new Set(prev)
+      if (next.has(colaboradorId)) next.delete(colaboradorId)
+      else next.add(colaboradorId)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -326,18 +336,22 @@ export default function Colaboradores() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="overflow-x-auto">
+        <div className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
-                <th className="px-5 py-3 font-semibold">Nombre</th>
-                <th className="px-5 py-3 font-semibold">Correo</th>
-                <th className="px-5 py-3 font-semibold">Rol</th>
-                <th className="px-5 py-3 font-semibold">Equipo</th>
-                <th className="px-5 py-3 font-semibold">Tipo de curso</th>
-                <th className="px-5 py-3 font-semibold">Curso asociado</th>
-                <th className="px-5 py-3 font-semibold">Estado</th>
-                <th className="px-5 py-3 font-semibold" />
+              <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Nombre</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Correo</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Rol</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Equipo</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
+                  Tipo de curso
+                </th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
+                  Curso asociado
+                </th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Estado</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -376,8 +390,26 @@ export default function Colaboradores() {
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.rol}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.equipo ?? '–'}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipoCurso ?? '–'}</td>
-                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
-                        {cursos && cursos.length > 0 ? cursos.join(', ') : 'Sin curso asignado'}
+                      <td className="max-w-[220px] px-5 py-3 text-gray-600 dark:text-gray-400">
+                        {(() => {
+                          if (!cursos || cursos.length === 0) return 'Sin curso asignado'
+                          const texto = cursos.join(', ')
+                          const expandido = cursosExpandidos.has(c.id)
+                          const esLargo = texto.length > 40
+                          if (!esLargo) return texto
+                          return (
+                            <span>
+                              {expandido ? texto : `${texto.slice(0, 40)}…`}{' '}
+                              <button
+                                type="button"
+                                onClick={() => toggleCursosExpandido(c.id)}
+                                className="font-medium text-blue-600 hover:underline dark:text-indigo-400"
+                              >
+                                {expandido ? 'Ver menos' : 'Ver más'}
+                              </button>
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="px-5 py-3">
                         <span
