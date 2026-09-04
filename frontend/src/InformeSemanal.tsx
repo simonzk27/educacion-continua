@@ -582,6 +582,6 @@ export default function InformeSemanal() {
 function addWeeks(iso: string, delta: number): string {
   const [y, m, d] = iso.split('-').map(Number)
   const dt = new Date(y, m - 1, d)
-  dt.setDate(dt.getDate() + delta * 7)
+  dt.setDate(dt.getDate() + delta * 9)
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }

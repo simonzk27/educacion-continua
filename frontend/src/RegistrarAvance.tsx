@@ -8,6 +8,7 @@ import {
   getDocs,
   onSnapshot,
   query,
+  type QuerySnapshot,
   serverTimestamp,
   updateDoc,
   where,
@@ -48,9 +49,15 @@ type InscripcionSeleccionada = {
   confirmado: boolean
 }
 
+function horaActualStr(): string {
+  const ahora = new Date()
+  return `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
+}
+
 const emptyForm = {
   fecha: '',
   horaInicio: '',
+  horaFin: '',
   leccionInicial: '',
   leccionFinal: '',
   aprendizaje: '',
@@ -92,7 +99,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
   const [rangosRegistrados, setRangosRegistrados] = useState<{ leccionInicial: number; leccionFinal: number }[]>([])
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'cursos'), (snap) => {
+    function aplicarCursos(snap: QuerySnapshot) {
       const map: Record<string, Curso> = {}
       snap.docs.forEach((d) => {
         const data = d.data()
@@ -105,24 +112,27 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
         }
       })
       setCursosPorId(map)
-    })
+    }
+    const q = collection(db, 'cursos')
+    getDocs(q).then(aplicarCursos).catch(() => {})
+    return onSnapshot(q, aplicarCursos)
   }, [])
 
   useEffect(() => {
+    function aplicarSnapshot(snap: QuerySnapshot) {
+      setCursoIds(snap.docs.map((d) => d.ref.parent.parent?.id).filter((id): id is string => !!id))
+      setLoading(false)
+    }
+
     const q = query(collectionGroup(db, 'inscripciones'), where('userId', '==', userId))
-    return onSnapshot(
-      q,
-      (snap) => {
-        setCursoIds(snap.docs.map((d) => d.ref.parent.parent?.id).filter((id): id is string => !!id))
-        setLoading(false)
-      },
-      () => setLoading(false),
-    )
+    getDocs(q)
+      .then(aplicarSnapshot)
+      .catch(() => {})
+    return onSnapshot(q, aplicarSnapshot, () => setLoading(false))
   }, [userId])
 
   useEffect(() => {
-    const q = query(collection(db, 'horarios'), where('userId', '==', userId))
-    return onSnapshot(q, (snap) => {
+    function aplicarHorarios(snap: QuerySnapshot) {
       const map: Record<string, Horario> = {}
       snap.docs.forEach((d) => {
         const data = d.data()
@@ -139,7 +149,10 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
         }
       })
       setHorariosPorCurso(map)
-    })
+    }
+    const q = query(collection(db, 'horarios'), where('userId', '==', userId))
+    getDocs(q).then(aplicarHorarios).catch(() => {})
+    return onSnapshot(q, aplicarHorarios)
   }, [userId])
 
   useEffect(() => {
@@ -244,6 +257,29 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
     return out
   }, [form.leccionInicial, leccionesInfo])
 
+  function handleClickLeccion(n: number) {
+    if (leccionesInfo.cubiertas.has(n)) return
+    const inicial = Number(form.leccionInicial)
+    const eligiendoFinal = form.leccionInicial !== '' && form.leccionFinal === ''
+
+    if (!eligiendoFinal) {
+      setForm({ ...form, leccionInicial: String(n), leccionFinal: '' })
+      return
+    }
+    if (n === inicial) {
+      setForm({ ...form, leccionInicial: '', leccionFinal: '' })
+      return
+    }
+    if (n > inicial) {
+      const alcanzable = opcionesLeccionFinal.includes(n)
+      if (alcanzable) {
+        setForm({ ...form, leccionFinal: String(n) })
+        return
+      }
+    }
+    setForm({ ...form, leccionInicial: String(n), leccionFinal: '' })
+  }
+
   const sesionObjetivo = useMemo(() => {
     if (!selectedCursoId || esEducacionContinua) return null
     const curso = cursosPorId[selectedCursoId]
@@ -279,7 +315,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
   }, [sesionObjetivo])
 
   useEffect(() => {
-    setForm({ ...emptyForm, fecha: todayIso() })
+    setForm({ ...emptyForm, fecha: todayIso(), horaFin: horaActualStr() })
     setFormEC(emptyFormEC)
     setFormError(null)
     setGuardado(false)
@@ -313,6 +349,8 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
   function validar(): string | null {
     if (!sesionObjetivo) return 'No tenés una sesión programada para registrar avance.'
     if (!form.horaInicio) return 'Completá la hora de inicio.'
+    if (!form.horaFin) return 'Completá la hora de finalización.'
+    if (form.horaFin <= form.horaInicio) return 'La hora de finalización debe ser posterior a la hora de inicio.'
     if (!form.leccionInicial || !form.leccionFinal) return 'Indicá lección inicial y lección final.'
     const inicial = Number(form.leccionInicial)
     const final = Number(form.leccionFinal)
@@ -336,8 +374,6 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
     setFormError(null)
     setSubmitting(true)
     try {
-      const ahora = new Date()
-      const horaFin = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
       const leccionInicial = Number(form.leccionInicial)
       const leccionFinal = Number(form.leccionFinal)
       await addDoc(collection(db, 'avances'), {
@@ -345,7 +381,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
         cursoId: selectedCursoId,
         fecha: form.fecha,
         horaInicio: form.horaInicio,
-        horaFin,
+        horaFin: form.horaFin,
         lecciones: leccionFinal - leccionInicial + 1,
         leccionInicial,
         leccionFinal,
@@ -585,7 +621,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                 className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
               >
                 <div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Fecha <span className="font-normal text-gray-400 dark:text-gray-500">(automática)</span>
@@ -608,9 +644,20 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                         className={dateTimeInputClass}
                       />
                     </div>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Hora de fin <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={form.horaFin}
+                        onChange={(e) => setForm({ ...form, horaFin: e.target.value })}
+                        className={dateTimeInputClass}
+                      />
+                    </div>
                   </div>
                   <p className="mt-2 text-xs text-gray-400 italic dark:text-gray-500">
-                    La hora de finalización se registra automáticamente al guardar.
+                    La hora de fin viene precargada con la hora actual — ajustala si terminaste antes o después.
                   </p>
                 </div>
 
@@ -648,49 +695,69 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                     Ya registraste todas las lecciones de este curso.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                        Lección inicial <span className="text-red-500">*</span>
+                  <div>
+                    <div className="mb-3 flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Lecciones de esta sesión <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={form.leccionInicial}
-                        onChange={(e) => setForm({ ...form, leccionInicial: e.target.value, leccionFinal: '' })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                      >
-                        <option value="">Selecciona...</option>
-                        {leccionesInfo.libres.map((n) => {
-                          const cap = capituloDeLeccion(n)
-                          return (
-                            <option key={n} value={n}>
-                              {n}
-                              {cap ? ` (Cap. ${cap})` : ''}
-                            </option>
-                          )
-                        })}
-                      </select>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {form.leccionInicial && form.leccionFinal
+                          ? `Seleccionado: ${form.leccionInicial}–${form.leccionFinal}`
+                          : form.leccionInicial
+                            ? `Inicio: ${form.leccionInicial} · elegí el final`
+                            : ''}
+                      </span>
                     </div>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                        Lección final <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={form.leccionFinal}
-                        onChange={(e) => setForm({ ...form, leccionFinal: e.target.value })}
-                        disabled={!form.leccionInicial}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                      >
-                        <option value="">Selecciona...</option>
-                        {opcionesLeccionFinal.map((n) => {
-                          const cap = capituloDeLeccion(n)
-                          return (
-                            <option key={n} value={n}>
-                              {n}
-                              {cap ? ` (Cap. ${cap})` : ''}
-                            </option>
-                          )
-                        })}
-                      </select>
+                    <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
+                      Tocá la lección donde empezaste y luego la lección donde terminaste. Las lecciones en gris ya
+                      fueron registradas antes.
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      {(capitulosInfo.length > 0
+                        ? capitulosInfo
+                        : [{ numero: 0, inicio: 1, fin: leccionesInfo.total, lecciones: leccionesInfo.total }]
+                      ).map((cap) => (
+                        <div key={cap.numero}>
+                          {capitulosInfo.length > 0 && (
+                            <p className="mb-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                              Capítulo {cap.numero}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-1.5">
+                            {Array.from({ length: cap.fin - cap.inicio + 1 }, (_, i) => cap.inicio + i).map((n) => {
+                              const bloqueada = leccionesInfo.cubiertas.has(n)
+                              const inicial = Number(form.leccionInicial)
+                              const final = Number(form.leccionFinal)
+                              const enRango =
+                                form.leccionInicial !== '' &&
+                                form.leccionFinal !== '' &&
+                                n >= inicial &&
+                                n <= final
+                              const esInicioSolo = form.leccionInicial !== '' && n === inicial && form.leccionFinal === ''
+                              let estilo =
+                                'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-indigo-400'
+                              if (bloqueada) {
+                                estilo =
+                                  'cursor-not-allowed border-gray-100 bg-gray-100 text-gray-300 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600'
+                              } else if (enRango || esInicioSolo) {
+                                estilo =
+                                  'border-blue-600 bg-blue-600 text-white dark:border-indigo-500 dark:bg-indigo-500'
+                              }
+                              return (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  disabled={bloqueada}
+                                  onClick={() => handleClickLeccion(n)}
+                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition-colors ${estilo}`}
+                                >
+                                  {n}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

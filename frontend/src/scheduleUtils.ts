@@ -78,16 +78,17 @@ export function formatHora(hora: string | null): string {
   return `${h12}:${mStr} ${suffix}`
 }
 
+// Semana operativa: arranca jueves y cierra el viernes de la semana siguiente (9 días).
 export function inicioSemanaIso(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   const date = new Date(y, m - 1, d)
-  const dow = (date.getDay() + 6) % 7
-  date.setDate(date.getDate() - dow)
+  const diffDesdeJueves = (date.getDay() + 3) % 7 // getDay(): jueves = 4
+  date.setDate(date.getDate() - diffDesdeJueves)
   return dateToIso(date)
 }
 
 export function finSemanaIso(iso: string): string {
-  return addDays(inicioSemanaIso(iso), 6)
+  return addDays(inicioSemanaIso(iso), 8)
 }
 
 export function formatFechaSesion(fecha: string): string {

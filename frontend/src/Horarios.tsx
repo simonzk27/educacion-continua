@@ -15,7 +15,8 @@ import { collection, collectionGroup, doc, onSnapshot, orderBy, query, setDoc } 
 import { db } from './firebase'
 import { addDays, ocurrenciasEntre, formatFechaSesion } from './scheduleUtils'
 
-type Equipo = 'Educación Continua' | 'Unimetab' | 'Academia'
+type Equipo = 'Colombia' | 'USA'
+type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia'
 type Estado = 'Activo' | 'Inactivo'
 type Dia = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo'
 
@@ -35,6 +36,7 @@ type Usuario = {
   id: string
   nombre: string
   equipo: Equipo | null
+  tipoCurso: TipoCurso | null
   activo: boolean
 }
 
@@ -67,6 +69,7 @@ type Fila = {
   cursoId: string
   colaborador: string
   equipo: Equipo | null
+  tipoCurso: TipoCurso | null
   activo: boolean
   curso: string
   modo: Modo
@@ -165,6 +168,7 @@ export default function Horarios() {
   const [loadingHorarios, setLoadingHorarios] = useState(true)
 
   const [equipo, setEquipo] = useState('Todas')
+  const [tipoCurso, setTipoCurso] = useState('Todos')
   const [colaborador, setColaborador] = useState('Todos')
   const [curso, setCurso] = useState('Todos')
   const [estado, setEstado] = useState('Todos')
@@ -191,6 +195,7 @@ export default function Horarios() {
               id: d.id,
               nombre: data.nombre ?? '',
               equipo: (data.equipo as Equipo) ?? null,
+              tipoCurso: (data.tipoCurso as TipoCurso) ?? null,
               activo: data.activo !== false,
             }
           }),
@@ -311,6 +316,7 @@ export default function Horarios() {
           cursoId: insc.cursoId,
           colaborador: u.nombre,
           equipo: u.equipo,
+          tipoCurso: u.tipoCurso,
           activo: u.activo,
           curso: cursoNombres[insc.cursoId] ?? insc.cursoId,
           modo: h?.modo ?? 'semanal',
@@ -334,11 +340,12 @@ export default function Horarios() {
 
   const filtradas = filas.filter((f) => {
     const matchEquipo = equipo === 'Todas' || f.equipo === equipo
+    const matchTipoCurso = tipoCurso === 'Todos' || f.tipoCurso === tipoCurso
     const matchColaborador = colaborador === 'Todos' || f.colaborador === colaborador
     const matchCurso = curso === 'Todos' || f.curso === curso
     const estadoFila: Estado = f.activo ? 'Activo' : 'Inactivo'
     const matchEstado = estado === 'Todos' || estadoFila === estado
-    return matchEquipo && matchColaborador && matchCurso && matchEstado
+    return matchEquipo && matchTipoCurso && matchColaborador && matchCurso && matchEstado
   })
 
   useEffect(() => {
@@ -518,7 +525,7 @@ export default function Horarios() {
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-              Equipo / Línea de negocio
+              Equipo
             </label>
             <select
               value={equipo}
@@ -526,6 +533,20 @@ export default function Horarios() {
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
             >
               <option>Todas</option>
+              <option>Colombia</option>
+              <option>USA</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+              Tipo de curso
+            </label>
+            <select
+              value={tipoCurso}
+              onChange={(e) => setTipoCurso(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            >
+              <option>Todos</option>
               <option>Educación Continua</option>
               <option>Unimetab</option>
               <option>Academia</option>
@@ -585,6 +606,7 @@ export default function Horarios() {
               <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
                 <th className="px-5 py-3 font-semibold">Colaborador</th>
                 <th className="px-5 py-3 font-semibold">Equipo</th>
+                <th className="px-5 py-3 font-semibold">Tipo de curso</th>
                 <th className="px-5 py-3 font-semibold">Curso</th>
                 <th className="px-5 py-3 font-semibold">Días</th>
                 <th className="px-5 py-3 font-semibold">Hora</th>
@@ -597,13 +619,13 @@ export default function Horarios() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={10} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
                     Cargando...
                   </td>
                 </tr>
               ) : filtradas.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={10} className="px-5 py-6 text-center text-gray-400 dark:text-gray-500">
                     No hay horarios todavía.
                   </td>
                 </tr>
@@ -616,6 +638,7 @@ export default function Horarios() {
                         {f.colaborador}
                       </td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo ?? '–'}</td>
+                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.tipoCurso ?? '–'}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.curso}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
                         {f.modo === 'mensual' && f.fechas.length > 0

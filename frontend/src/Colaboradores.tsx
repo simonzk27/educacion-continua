@@ -24,7 +24,8 @@ import { auth, db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
 
 type Rol = 'Admin' | 'Usuario'
 type Estado = 'Activo' | 'Inactivo'
-type Equipo = 'Educación Continua' | 'Unimetab' | 'Academia'
+type Equipo = 'Colombia' | 'USA'
+type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia'
 
 type Colaborador = {
   id: string
@@ -32,6 +33,7 @@ type Colaborador = {
   email: string
   rol: Rol
   equipo: Equipo | null
+  tipoCurso: TipoCurso | null
   activo: boolean
   puedeCambiarPassword: boolean
 }
@@ -41,7 +43,8 @@ const firestoreToRol: Record<string, Rol> = { admin: 'Admin', usuario: 'Usuario'
 
 const roles: Rol[] = ['Admin', 'Usuario']
 const estados: Estado[] = ['Activo', 'Inactivo']
-const equipos: Equipo[] = ['Educación Continua', 'Unimetab', 'Academia']
+const equipos: Equipo[] = ['Colombia', 'USA']
+const tiposCurso: TipoCurso[] = ['Educación Continua', 'Unimetab', 'Academia']
 
 const estadoStyles: Record<Estado, string> = {
   Activo: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
@@ -66,6 +69,7 @@ const emptyForm = {
   password: '',
   rol: '' as Rol | '',
   equipo: '' as Equipo | '',
+  tipoCurso: '' as TipoCurso | '',
   estado: '' as Estado | '',
 }
 
@@ -98,6 +102,7 @@ export default function Colaboradores() {
             email: data.email ?? '',
             rol: firestoreToRol[data.rol] ?? 'Usuario',
             equipo: (data.equipo as Equipo) ?? null,
+            tipoCurso: (data.tipoCurso as TipoCurso) ?? null,
             activo: data.activo !== false,
             puedeCambiarPassword: data.puedeCambiarPassword === true,
           }
@@ -161,6 +166,7 @@ export default function Colaboradores() {
       password: '',
       rol: colaborador.rol,
       equipo: colaborador.equipo ?? '',
+      tipoCurso: colaborador.tipoCurso ?? '',
       estado: colaborador.activo ? 'Activo' : 'Inactivo',
     })
     setFormError(null)
@@ -186,6 +192,7 @@ export default function Colaboradores() {
       (!editingId && !passwordValida) ||
       !form.rol ||
       !form.equipo ||
+      !form.tipoCurso ||
       !form.estado
     ) {
       setFormError(
@@ -203,6 +210,7 @@ export default function Colaboradores() {
           nombre: form.nombre.trim(),
           rol: rolToFirestore[form.rol],
           equipo: form.equipo,
+          tipoCurso: form.tipoCurso,
           activo: form.estado === 'Activo',
         })
         setToast('Colaborador actualizado correctamente.')
@@ -215,6 +223,7 @@ export default function Colaboradores() {
             email: form.email.trim(),
             rol: rolToFirestore[form.rol],
             equipo: form.equipo,
+            tipoCurso: form.tipoCurso,
             activo: form.estado === 'Activo',
           })
         } finally {
@@ -324,7 +333,8 @@ export default function Colaboradores() {
                 <th className="px-5 py-3 font-semibold">Nombre</th>
                 <th className="px-5 py-3 font-semibold">Correo</th>
                 <th className="px-5 py-3 font-semibold">Rol</th>
-                <th className="px-5 py-3 font-semibold">Equipo / Línea de negocio</th>
+                <th className="px-5 py-3 font-semibold">Equipo</th>
+                <th className="px-5 py-3 font-semibold">Tipo de curso</th>
                 <th className="px-5 py-3 font-semibold">Curso asociado</th>
                 <th className="px-5 py-3 font-semibold">Estado</th>
                 <th className="px-5 py-3 font-semibold" />
@@ -334,14 +344,14 @@ export default function Colaboradores() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={`skeleton-${i}`}>
-                    <td colSpan={7} className="px-5 py-4">
+                    <td colSpan={8} className="px-5 py-4">
                       <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                     </td>
                   </tr>
                 ))
               ) : colaboradores.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12">
+                  <td colSpan={8} className="px-5 py-12">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Inbox className="h-8 w-8" />
                       <p className="text-sm">No hay colaboradores todavía.</p>
@@ -365,6 +375,7 @@ export default function Colaboradores() {
                       <td className="px-5 py-3 text-gray-400 dark:text-gray-500">{c.email}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.rol}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.equipo ?? '–'}</td>
+                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipoCurso ?? '–'}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
                         {cursos && cursos.length > 0 ? cursos.join(', ') : 'Sin curso asignado'}
                       </td>
@@ -525,7 +536,7 @@ export default function Colaboradores() {
 
               <div>
                 <label htmlFor="equipo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Equipo / Línea de negocio
+                  Equipo
                 </label>
                 <select
                   id="equipo"
@@ -535,6 +546,25 @@ export default function Colaboradores() {
                 >
                   <option value="">Seleccionar...</option>
                   {equipos.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="tipoCurso" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tipo de curso
+                </label>
+                <select
+                  id="tipoCurso"
+                  value={form.tipoCurso}
+                  onChange={(e) => setForm({ ...form, tipoCurso: e.target.value as TipoCurso })}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                >
+                  <option value="">Seleccionar...</option>
+                  {tiposCurso.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>

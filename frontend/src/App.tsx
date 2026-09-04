@@ -60,7 +60,7 @@ function App() {
   } else if (activeView === 'registrar-avance') {
     content = <RegistrarAvance userId={firebaseUser.uid} />
   } else if (activeView === 'dashboard-hoy') {
-    content = <Dashboard />
+    content = <Dashboard isAdmin={role === 'Admin'} />
   } else if (activeView === 'horarios') {
     content = <Horarios />
   } else if (activeView === 'informe-semanal') {
@@ -68,7 +68,7 @@ function App() {
   } else if (activeView === 'colaboradores') {
     content = <Colaboradores />
   } else if (activeView === 'listado-cursos') {
-    content = <ListadoCursos isAdmin={role === 'Admin'} />
+    content = <ListadoCursos />
   } else if (activeView === 'alertas') {
     content = <Alertas userId={firebaseUser.uid} />
   } else {

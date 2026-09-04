@@ -1,9 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  ChevronUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Clock,
   Flame,
   ListChecks,
@@ -16,144 +12,19 @@ import {
   Inbox,
 } from 'lucide-react'
 import { collection, collectionGroup, onSnapshot, type Timestamp } from 'firebase/firestore'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { db } from './firebase'
 import { type Dia, type Modo, addDays, dateToIso, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
-
-const diasCortos = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do']
-
-function addMonths(iso: string, delta: number): string {
-  const [y, m] = iso.split('-').map(Number)
-  const dt = new Date(y, m - 1 + delta, 1)
-  return dateToIso(dt)
-}
-
-function buildMonthGridFor(monthIso: string): (string | null)[] {
-  const [y, m] = monthIso.split('-').map(Number)
-  const first = new Date(y, m - 1, 1)
-  const daysInMonth = new Date(y, m, 0).getDate()
-  const startOffset = (first.getDay() + 6) % 7
-  const cells: (string | null)[] = new Array(startOffset).fill(null)
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(dateToIso(new Date(y, m - 1, d)))
-  }
-  return cells
-}
-
-type FechaCalendarioProps = {
-  readonly value: string
-  readonly onChange: (fecha: string) => void
-  readonly disabled?: boolean
-}
-
-function FechaCalendario({ value, onChange, disabled }: FechaCalendarioProps) {
-  const [abierto, setAbierto] = useState(false)
-  const [mesVista, setMesVista] = useState(`${value.slice(0, 7)}-01`)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!abierto) return
-    function onClickFuera(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false)
-    }
-    document.addEventListener('mousedown', onClickFuera)
-    return () => document.removeEventListener('mousedown', onClickFuera)
-  }, [abierto])
-
-  function abrir() {
-    setMesVista(`${value.slice(0, 7)}-01`)
-    setAbierto(true)
-  }
-
-  const grid = useMemo(() => buildMonthGridFor(mesVista), [mesVista])
-  const mesLabel = new Date(`${mesVista}T00:00:00`).toLocaleDateString('es-CO', {
-    month: 'long',
-    year: 'numeric',
-  })
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => (abierto ? setAbierto(false) : abrir())}
-        className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-      >
-        <CalendarDays className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-        {formatFechaCorta(value)}
-      </button>
-
-      {abierto && (
-        <div className="absolute top-full left-0 z-20 mt-1.5 w-64 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between bg-gradient-to-br from-blue-500 to-blue-400 px-3 py-2.5 text-white dark:from-indigo-500 dark:to-indigo-400">
-            <button
-              type="button"
-              onClick={() => setMesVista((m) => addMonths(m, -1))}
-              disabled={mesVista <= `${todayIso().slice(0, 7)}-01`}
-              className="rounded-lg p-1 hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-bold capitalize">{mesLabel}</span>
-            <button
-              type="button"
-              onClick={() => setMesVista((m) => addMonths(m, 1))}
-              className="rounded-lg p-1 hover:bg-white/20"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="p-3">
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-              {diasCortos.map((d) => (
-                <span key={d}>{d}</span>
-              ))}
-            </div>
-            <div className="mt-1.5 grid grid-cols-7 gap-1">
-              {grid.map((fecha, i) => {
-                if (!fecha) return <span key={`pad-${i}`} />
-                const habilitado = fecha >= todayIso()
-                const activo = fecha === value
-                const esHoy = fecha === todayIso()
-                const dayNum = Number(fecha.split('-')[2])
-                return (
-                  <button
-                    key={fecha}
-                    type="button"
-                    disabled={!habilitado}
-                    onClick={() => {
-                      onChange(fecha)
-                      setAbierto(false)
-                    }}
-                    className={`relative flex aspect-square items-center justify-center rounded-full text-sm font-medium transition-all ${
-                      activo
-                        ? 'scale-105 bg-blue-600 text-white shadow-md shadow-blue-600/30 dark:bg-indigo-500 dark:shadow-indigo-500/30'
-                        : habilitado
-                          ? 'text-gray-700 hover:scale-105 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
-                          : 'text-gray-300 dark:text-gray-700'
-                    }`}
-                  >
-                    {dayNum}
-                    {esHoy && !activo && (
-                      <span className="absolute bottom-1 h-1 w-1 rounded-full bg-blue-500 dark:bg-indigo-400" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+import Tablero from './Tablero'
 
 type Estado = 'Reportó' | 'Pendiente' | 'No reportó'
-type Tab = 'general' | 'diario'
+type Tab = 'general' | 'diario' | 'tablero'
 
 type Usuario = {
   id: string
   nombre: string
   equipo: string | null
+  tipoCurso: string | null
   activo: boolean
 }
 
@@ -194,6 +65,7 @@ type Fila = {
   userId: string
   colaborador: string
   equipo: string | null
+  tipoCurso: string | null
   curso: string
   horaMin: number
   horario: string
@@ -221,24 +93,9 @@ const railStyles: Record<Estado, string> = {
   'No reportó': 'bg-red-500',
 }
 
-function formatFechaLarga(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const label = new Date(y, m - 1, d).toLocaleDateString('es-CO', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-  return label.charAt(0).toUpperCase() + label.slice(1)
-}
-
 function horaAMin(hora: string): number {
   const [h, m] = hora.split(':').map(Number)
   return h * 60 + m
-}
-
-function finDeAnioIso(): string {
-  return `${new Date().getFullYear()}-12-31`
 }
 
 function iniciales(nombre: string): string {
@@ -252,15 +109,42 @@ function formatFechaCorta(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }
 
+function useIsDark(): boolean {
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+  useEffect(() => {
+    const el = document.documentElement
+    const observer = new MutationObserver(() => setIsDark(el.classList.contains('dark')))
+    observer.observe(el, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+  return isDark
+}
+
+function inicioSemanaLunes(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const dow = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - dow)
+  return dateToIso(date)
+}
+
 // Racha de cumplimiento no tiene una definición de dato real todavía (requeriría
 // historial agregado por colaborador); se deja como dato de prueba a propósito.
 const RACHA_PRUEBA_DIAS = 12
 
-export default function Dashboard() {
+type DashboardProps = {
+  readonly isAdmin: boolean
+}
+
+export default function Dashboard({ isAdmin }: DashboardProps) {
+  const isDark = useIsDark()
+  const axisColor = isDark ? '#9ca3af' : '#6b7280'
+  const gridColor = isDark ? '#1f2937' : '#f3f4f6'
   const [tab, setTab] = useState<Tab>('general')
-  const [fecha, setFecha] = useState(todayIso())
-  const [verAnio, setVerAnio] = useState(false)
+  const [rangoDesde, setRangoDesde] = useState('')
+  const [rangoHasta, setRangoHasta] = useState('')
   const [equipo, setEquipo] = useState('Todas')
+  const [tipoCurso, setTipoCurso] = useState('Todos')
   const [estado, setEstado] = useState('Todos')
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
@@ -279,6 +163,7 @@ export default function Dashboard() {
             id: d.id,
             nombre: (data.nombre as string) ?? '',
             equipo: (data.equipo as string) ?? null,
+            tipoCurso: (data.tipoCurso as string) ?? null,
             activo: data.activo !== false,
           }
         }),
@@ -397,6 +282,7 @@ export default function Dashboard() {
             userId: insc.userId,
             colaborador: user.nombre,
             equipo: user.equipo,
+            tipoCurso: user.tipoCurso,
             curso: curso.nombre,
             horaMin: horaAMin(horario.hora as string),
             horario: formatHora(horario.hora),
@@ -411,15 +297,19 @@ export default function Dashboard() {
       .sort((a, b) => (a.fecha === b.fecha ? a.horaMin - b.horaMin : a.fecha.localeCompare(b.fecha)))
   }
 
-  const filasFecha = useMemo(
-    () => (verAnio ? filasEnRango(todayIso(), finDeAnioIso()) : filasEnRango(fecha, fecha)),
-    [fecha, verAnio, inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances],
-  )
+  const rangoActivo = Boolean(rangoDesde && rangoHasta)
+
+  const filasFecha = useMemo(() => {
+    const desde = rangoActivo ? rangoDesde : addDays(todayIso(), -1825)
+    const hasta = rangoActivo ? rangoHasta : addDays(todayIso(), 1825)
+    return filasEnRango(desde, hasta)
+  }, [rangoActivo, rangoDesde, rangoHasta, inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances])
 
   const filtradas = filasFecha.filter((f) => {
     const matchEquipo = equipo === 'Todas' || f.equipo === equipo
+    const matchTipoCurso = tipoCurso === 'Todos' || f.tipoCurso === tipoCurso
     const matchEstado = estado === 'Todos' || f.estado === estado
-    return matchEquipo && matchEstado
+    return matchEquipo && matchTipoCurso && matchEstado
   })
 
   const programadas = filtradas.length
@@ -427,6 +317,25 @@ export default function Dashboard() {
   const pendientes = filtradas.filter((f) => f.estado === 'Pendiente').length
   const noReportaron = filtradas.filter((f) => f.estado === 'No reportó').length
   const porcentaje = programadas > 0 ? Math.round((reportaron / programadas) * 100) : 0
+
+  const leccionesPorSemana = useMemo(() => {
+    const semanaActualInicio = inicioSemanaLunes(todayIso())
+    const semanas = Array.from({ length: 8 }, (_, i) => addDays(semanaActualInicio, -7 * (7 - i)))
+    const totales: Record<string, number> = {}
+    semanas.forEach((s) => {
+      totales[s] = 0
+    })
+    avances.forEach((a) => {
+      if (!a.fecha) return
+      const semana = inicioSemanaLunes(a.fecha)
+      if (semana in totales) totales[semana] += a.lecciones
+    })
+    return semanas.map((s) => ({
+      semana: s,
+      label: formatFechaCorta(s),
+      lecciones: totales[s],
+    }))
+  }, [avances])
 
   const filasHoy = useMemo(
     () => filasEnRango(todayIso(), todayIso()),
@@ -451,9 +360,11 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {tab === 'general' && verAnio
-              ? `Desde hoy hasta ${formatFechaCorta(finDeAnioIso())}`
-              : formatFechaLarga(fecha)}
+            {tab === 'tablero'
+              ? 'Matriz de colaboradores y cursos'
+              : rangoActivo
+                ? `Del ${formatFechaCorta(rangoDesde)} al ${formatFechaCorta(rangoHasta)}`
+                : 'Todas las sesiones programadas'}
           </p>
         </div>
       </div>
@@ -481,9 +392,22 @@ export default function Dashboard() {
         >
           Diario
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('tablero')}
+          className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+            tab === 'tablero'
+              ? 'border-blue-600 text-blue-600 dark:border-indigo-400 dark:text-indigo-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          Tablero
+        </button>
       </div>
 
-      {tab === 'general' ? (
+      {tab === 'tablero' ? (
+        <Tablero isAdmin={isAdmin} />
+      ) : tab === 'general' ? (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             <div className="group rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
@@ -524,56 +448,65 @@ export default function Dashboard() {
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Lecciones registradas por semana · últimas 8 semanas
+            </h2>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={leccionesPorSemana} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 12, fill: axisColor }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: axisColor }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    cursor={{ fill: gridColor }}
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: 'none',
+                      fontSize: 13,
+                      backgroundColor: isDark ? '#111827' : '#ffffff',
+                      color: isDark ? '#f3f4f6' : '#111827',
+                    }}
+                    labelFormatter={(label) => `Semana del ${label}`}
+                    formatter={(value) => [value, 'Lecciones']}
+                  />
+                  <Bar dataKey="lecciones" fill={isDark ? '#6366f1' : '#2563eb'} radius={[6, 6, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <div className="flex flex-wrap items-end gap-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Fecha
+                  Desde
                 </label>
-                <div className="flex items-stretch gap-1.5">
-                  <FechaCalendario
-                    value={fecha}
-                    disabled={verAnio}
-                    onChange={(f) => setFecha(f < todayIso() ? todayIso() : f)}
-                  />
-                  <div className="flex flex-col overflow-hidden rounded-lg border border-gray-300 dark:border-gray-700">
-                    <button
-                      type="button"
-                      title="Un día después"
-                      disabled={verAnio}
-                      onClick={() => setFecha((f) => addDays(f, 1))}
-                      className="flex h-[19px] w-8 items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
-                    >
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Un día antes"
-                      disabled={verAnio || fecha === todayIso()}
-                      onClick={() => setFecha((f) => (f === todayIso() ? f : addDays(f, -1)))}
-                      className="flex h-[19px] w-8 items-center justify-center border-t border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:text-gray-300 disabled:opacity-50 disabled:hover:bg-transparent dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400 dark:disabled:text-gray-700"
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Rango
-                </span>
-                <label className="flex h-[38px] cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={verAnio}
-                    onChange={(e) => setVerAnio(e.target.checked)}
-                    className="h-4 w-4 accent-blue-600 dark:accent-indigo-500"
-                  />
-                  Ver todo el año
-                </label>
+                <input
+                  type="date"
+                  value={rangoDesde}
+                  onChange={(e) => setRangoDesde(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:[color-scheme:dark]"
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Equipo / Línea de negocio
+                  Hasta
+                </label>
+                <input
+                  type="date"
+                  value={rangoHasta}
+                  onChange={(e) => setRangoHasta(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:[color-scheme:dark]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Equipo
                 </label>
                 <select
                   value={equipo}
@@ -581,6 +514,20 @@ export default function Dashboard() {
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 >
                   <option>Todas</option>
+                  <option>Colombia</option>
+                  <option>USA</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Tipo de curso
+                </label>
+                <select
+                  value={tipoCurso}
+                  onChange={(e) => setTipoCurso(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                >
+                  <option>Todos</option>
                   <option>Educación Continua</option>
                   <option>Unimetab</option>
                   <option>Academia</option>
@@ -604,9 +551,10 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => {
-                  setFecha(todayIso())
-                  setVerAnio(false)
+                  setRangoDesde('')
+                  setRangoHasta('')
                   setEquipo('Todas')
+                  setTipoCurso('Todos')
                   setEstado('Todos')
                 }}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
@@ -623,8 +571,9 @@ export default function Dashboard() {
                   <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
                     <th className="px-5 py-3 font-semibold">Colaborador</th>
                     <th className="px-5 py-3 font-semibold">Equipo</th>
+                    <th className="px-5 py-3 font-semibold">Tipo de curso</th>
                     <th className="px-5 py-3 font-semibold">Curso</th>
-                    {verAnio && <th className="px-5 py-3 font-semibold">Fecha</th>}
+                    <th className="px-5 py-3 font-semibold">Fecha</th>
                     <th className="px-5 py-3 font-semibold">Horario</th>
                     <th className="px-5 py-3 font-semibold">Estado</th>
                     <th className="px-5 py-3 font-semibold">Lecciones</th>
@@ -636,20 +585,20 @@ export default function Dashboard() {
                   {loading ? (
                     Array.from({ length: 4 }).map((_, i) => (
                       <tr key={`skeleton-${i}`}>
-                        <td colSpan={verAnio ? 9 : 8} className="px-5 py-4">
+                        <td colSpan={10} className="px-5 py-4">
                           <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                         </td>
                       </tr>
                     ))
                   ) : filtradas.length === 0 ? (
                     <tr>
-                      <td colSpan={verAnio ? 9 : 8} className="px-5 py-12">
+                      <td colSpan={10} className="px-5 py-12">
                         <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                           <Inbox className="h-8 w-8" />
                           <p className="text-sm">
-                            {verAnio
-                              ? 'No hay sesiones programadas de hoy en adelante.'
-                              : 'No hay sesiones programadas para esta fecha.'}
+                            {rangoActivo
+                              ? 'No hay sesiones programadas en ese rango de fechas.'
+                              : 'No hay sesiones programadas.'}
                           </p>
                         </div>
                       </td>
@@ -674,12 +623,11 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo ?? '–'}</td>
+                        <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.tipoCurso ?? '–'}</td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.curso}</td>
-                        {verAnio && (
-                          <td className="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
-                            {formatFechaCorta(f.fecha)}
-                          </td>
-                        )}
+                        <td className="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
+                          {formatFechaCorta(f.fecha)}
+                        </td>
                         <td className="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {f.horario}
                         </td>

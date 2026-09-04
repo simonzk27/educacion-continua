@@ -1,6 +1,6 @@
 import { initializeApp, getApps, deleteApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { initializeFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,7 +13,11 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
-export const db = getFirestore(app)
+// autoDetectLongPolling: en la primera carga (recién logueado, conexión WebChannel
+// todavía sin establecer) los onSnapshot podían quedar colgados sin error visible
+// hasta desmontar/remontar el listener al cambiar de módulo. Forzar long-polling
+// cuando el streaming falla evita ese primer listener "mudo".
+export const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true })
 
 // Secondary app instance: crea usuarios nuevos (Admin) sin pisar la sesión activa.
 export function getSecondaryAuth() {

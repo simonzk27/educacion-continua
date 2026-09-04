@@ -3,13 +3,27 @@ import {
   ArrowRight,
   BookOpen,
   CalendarClock,
+  Check,
   CheckCircle2,
   ClipboardList,
   Clock,
   Inbox,
   KeyRound,
+  X,
 } from 'lucide-react'
-import { collection, collectionGroup, limit, onSnapshot, orderBy, query, where, doc, updateDoc } from 'firebase/firestore'
+import {
+  collection,
+  collectionGroup,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  type QuerySnapshot,
+  where,
+  doc,
+  updateDoc,
+} from 'firebase/firestore'
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -30,8 +44,14 @@ import {
 type Curso = {
   id: string
   nombre: string
+  tipo: string
   duracionValor: number
   duracionUnidad: string
+}
+
+type InscripcionInfo = {
+  completado: boolean
+  confirmado: boolean
 }
 
 type Horario = {
@@ -128,40 +148,53 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'cursos'), (snap) => {
+    function aplicarCursos(snap: QuerySnapshot) {
       const map: Record<string, Curso> = {}
       snap.docs.forEach((d) => {
         const data = d.data()
         map[d.id] = {
           id: d.id,
           nombre: (data.nombre as string) ?? d.id,
+          tipo: (data.tipo as string) ?? '',
           duracionValor: (data.duracionValor as number) ?? 0,
           duracionUnidad: (data.duracionUnidad as string) ?? '',
         }
       })
       setCursosPorId(map)
-    })
+    }
+    const q = collection(db, 'cursos')
+    getDocs(q).then(aplicarCursos).catch(() => {})
+    return onSnapshot(q, aplicarCursos)
   }, [])
 
+  const [inscripcionesPorCurso, setInscripcionesPorCurso] = useState<Record<string, InscripcionInfo>>({})
+
   useEffect(() => {
+    function aplicarSnapshot(snap: QuerySnapshot) {
+      setCursoIds(snap.docs.map((d) => d.ref.parent.parent?.id).filter((id): id is string => !!id))
+      const map: Record<string, InscripcionInfo> = {}
+      snap.docs.forEach((d) => {
+        const cursoId = d.ref.parent.parent?.id
+        if (!cursoId) return
+        const data = d.data()
+        map[cursoId] = {
+          completado: data.completado === true,
+          confirmado: data.confirmado !== false,
+        }
+      })
+      setInscripcionesPorCurso(map)
+      setLoading(false)
+    }
+
     const q = query(collectionGroup(db, 'inscripciones'), where('userId', '==', userId))
-    return onSnapshot(
-      q,
-      (snap) => {
-        setCursoIds(
-          snap.docs
-            .map((d) => d.ref.parent.parent?.id)
-            .filter((id): id is string => !!id),
-        )
-        setLoading(false)
-      },
-      () => setLoading(false),
-    )
+    getDocs(q)
+      .then(aplicarSnapshot)
+      .catch(() => {})
+    return onSnapshot(q, aplicarSnapshot, () => setLoading(false))
   }, [userId])
 
   useEffect(() => {
-    const q = query(collection(db, 'horarios'), where('userId', '==', userId))
-    return onSnapshot(q, (snap) => {
+    function aplicarHorarios(snap: QuerySnapshot) {
       const map: Record<string, Horario> = {}
       snap.docs.forEach((d) => {
         const data = d.data()
@@ -178,7 +211,10 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
         }
       })
       setHorariosPorCurso(map)
-    })
+    }
+    const q = query(collection(db, 'horarios'), where('userId', '==', userId))
+    getDocs(q).then(aplicarHorarios).catch(() => {})
+    return onSnapshot(q, aplicarHorarios)
   }, [userId])
 
   const [ultimosReportes, setUltimosReportes] = useState<Avance[]>([])
@@ -251,6 +287,12 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
 
   const proximaSesion = proximasSesiones[0] ?? null
 
+  const [tab, setTab] = useState<'resumen' | 'tablero'>('resumen')
+
+  const misCursos = cursoIds
+    .map((id) => cursosPorId[id])
+    .filter((c): c is Curso => !!c)
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -265,6 +307,87 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
         </div>
       </div>
 
+      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-800">
+        <button
+          type="button"
+          onClick={() => setTab('resumen')}
+          className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+            tab === 'resumen'
+              ? 'border-blue-600 text-blue-600 dark:border-indigo-400 dark:text-indigo-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          Resumen
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('tablero')}
+          className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+            tab === 'tablero'
+              ? 'border-blue-600 text-blue-600 dark:border-indigo-400 dark:text-indigo-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+          }`}
+        >
+          Mi Tablero
+        </button>
+      </div>
+
+      {tab === 'tablero' ? (
+        <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
+                  <th className="px-5 py-3 font-semibold">Curso</th>
+                  <th className="px-5 py-3 font-semibold">Tipo de Curso</th>
+                  <th className="px-5 py-3 font-semibold">Finalizados</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <tr key={`mi-tablero-skeleton-${i}`}>
+                      <td colSpan={3} className="px-5 py-4">
+                        <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+                      </td>
+                    </tr>
+                  ))
+                ) : misCursos.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-12">
+                      <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+                        <Inbox className="h-8 w-8" />
+                        <p className="text-sm">No tenés cursos asignados todavía.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  misCursos.map((c) => {
+                    const insc = inscripcionesPorCurso[c.id]
+                    const finalizado = insc?.completado === true && insc?.confirmado === true
+                    return (
+                      <tr key={c.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
+                        <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">{c.nombre}</td>
+                        <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipo || '–'}</td>
+                        <td className="px-5 py-3">
+                          <span
+                            className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
+                              finalizado ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
+                            }`}
+                          >
+                            {finalizado ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-400 p-6 text-white shadow-sm dark:from-indigo-500 dark:to-indigo-400">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -490,6 +613,8 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
             </form>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   )
