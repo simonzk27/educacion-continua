@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { signInWithEmailAndPassword, type AuthError } from 'firebase/auth'
 import { AlertCircle, GraduationCap, Loader2, Lock, Mail } from 'lucide-react'
 import { auth } from './firebase'
@@ -19,6 +19,10 @@ function Login({ blockedMessage }: LoginProps) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(blockedMessage ?? null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (blockedMessage) setError(blockedMessage)
+  }, [blockedMessage])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
