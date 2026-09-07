@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert, KeyRound, Lock, LockOpen, Inbox } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert, KeyRound, Lock, LockOpen, Inbox, Search } from 'lucide-react'
 import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -57,6 +57,13 @@ const createErrorMessages: Record<string, string> = {
   'auth/weak-password': 'La contraseña debe tener al menos 8 caracteres y un número.',
 }
 
+function normalizar(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+}
+
 function iniciales(nombre: string): string {
   const partes = nombre.trim().split(/\s+/).slice(0, 2)
   const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
@@ -90,6 +97,7 @@ export default function Colaboradores() {
   const [resettingBusy, setResettingBusy] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [cursosExpandidos, setCursosExpandidos] = useState<Set<string>>(new Set())
+  const [colabSearch, setColabSearch] = useState('')
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('nombre'))
@@ -145,6 +153,16 @@ export default function Colaboradores() {
     })
     return map
   }, [inscripciones, cursoNombres])
+
+  const terminoColab = normalizar(colabSearch.trim())
+  const palabrasColab = terminoColab.split(/\s+/).filter(Boolean)
+  const colaboradoresFiltrados =
+    palabrasColab.length === 0
+      ? colaboradores
+      : colaboradores.filter((c) => {
+          const texto = normalizar(`${c.nombre} ${c.email}`)
+          return palabrasColab.every((p) => texto.includes(p))
+        })
 
   function toggleCursosExpandido(colaboradorId: string) {
     setCursosExpandidos((prev) => {
@@ -335,6 +353,29 @@ export default function Colaboradores() {
         </button>
       </div>
 
+      <div className="flex justify-end">
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={colabSearch}
+            onChange={(e) => setColabSearch(e.target.value)}
+            placeholder="Buscar por nombre o correo..."
+            className="w-full rounded-lg border border-gray-300 py-2 pr-9 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          />
+          {colabSearch && (
+            <button
+              type="button"
+              onClick={() => setColabSearch('')}
+              title="Limpiar búsqueda"
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
@@ -363,17 +404,19 @@ export default function Colaboradores() {
                     </td>
                   </tr>
                 ))
-              ) : colaboradores.length === 0 ? (
+              ) : colaboradoresFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-5 py-12">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Inbox className="h-8 w-8" />
-                      <p className="text-sm">No hay colaboradores todavía.</p>
+                      <p className="text-sm">
+                        {terminoColab ? 'No hay colaboradores que coincidan con la búsqueda.' : 'No hay colaboradores todavía.'}
+                      </p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                colaboradores.map((c) => {
+                colaboradoresFiltrados.map((c) => {
                   const estado: Estado = c.activo ? 'Activo' : 'Inactivo'
                   const cursos = cursosPorColaborador[c.id]
                   return (

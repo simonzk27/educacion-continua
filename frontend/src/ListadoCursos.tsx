@@ -67,6 +67,13 @@ function iniciales(nombre: string): string {
   return letras || '?'
 }
 
+function normalizar(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+}
+
 const estados: Estado[] = ['Activo', 'Inactivo', 'Próximo']
 const duracionUnidades: DuracionUnidad[] = ['Semanas', 'Lecciones']
 const tabs: Tab[] = ['Todos los cursos', 'Educación Continua', 'Academia', 'Unimetab']
@@ -160,15 +167,15 @@ export default function ListadoCursos() {
   }, [assignCurso])
 
   const porTab = tab === 'Todos los cursos' ? cursos : cursos.filter((c) => c.tipo === tab)
-  const terminoCurso = cursoSearch.trim().toLowerCase()
-  const filtrados = !terminoCurso
-    ? porTab
-    : porTab.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(terminoCurso) ||
-          c.categoria.toLowerCase().includes(terminoCurso) ||
-          c.instructor.toLowerCase().includes(terminoCurso),
-      )
+  const terminoCurso = normalizar(cursoSearch.trim())
+  const palabrasCurso = terminoCurso.split(/\s+/).filter(Boolean)
+  const filtrados =
+    palabrasCurso.length === 0
+      ? porTab
+      : porTab.filter((c) => {
+          const texto = normalizar(`${c.nombre} ${c.categoria} ${c.instructor}`)
+          return palabrasCurso.every((p) => texto.includes(p))
+        })
 
   function openAssignModal(curso: Curso) {
     setAssignCurso(curso)
@@ -419,8 +426,18 @@ export default function ListadoCursos() {
             value={cursoSearch}
             onChange={(e) => setCursoSearch(e.target.value)}
             placeholder="Buscar por nombre, categoría o instructor..."
-            className="w-full rounded-lg border border-gray-300 py-2 pr-3 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            className="w-full rounded-lg border border-gray-300 py-2 pr-9 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
           />
+          {cursoSearch && (
+            <button
+              type="button"
+              onClick={() => setCursoSearch('')}
+              title="Limpiar búsqueda"
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
