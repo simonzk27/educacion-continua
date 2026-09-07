@@ -256,8 +256,8 @@ export default function Tablero({ isAdmin }: TableroProps) {
               ))}
             </colgroup>
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
-                <th className="sticky top-0 left-0 z-30 bg-gray-50/60 px-5 py-3 font-semibold dark:bg-gray-950/40">
+              <tr className="border-b border-gray-100 bg-gray-50 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950 dark:text-gray-500">
+                <th className="sticky top-0 left-0 z-30 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
                   <span className="block truncate">Colaborador</span>
                   <span
                     onMouseDown={(e) => startColumnResize(e, 'colaborador', 180)}
@@ -267,7 +267,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
                     className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-400/50 active:bg-blue-500/60 dark:hover:bg-indigo-400/50"
                   />
                 </th>
-                <th className="sticky top-0 z-20 bg-gray-50/60 px-5 py-3 font-semibold dark:bg-gray-950/40">
+                <th className="sticky top-0 z-20 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
                   <span className="block truncate">Equipo</span>
                   <span
                     onMouseDown={(e) => startColumnResize(e, 'equipo', 150)}
@@ -280,7 +280,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
                 {cursosVisibles.map((c) => (
                   <th
                     key={c.id}
-                    className="sticky top-0 z-20 bg-gray-50/60 px-3 py-3 text-center font-semibold dark:bg-gray-950/40"
+                    className="sticky top-0 z-20 bg-gray-50 px-3 py-3 text-center font-semibold dark:bg-gray-950"
                   >
                     <span className="block truncate">{c.nombre}</span>
                     <span

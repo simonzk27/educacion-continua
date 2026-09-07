@@ -4,12 +4,12 @@ import {
   Flame,
   ListChecks,
   CircleDot,
-  CalendarDays,
   CheckCircle2,
   AlarmClockCheck,
   XCircle,
   Gauge,
   Inbox,
+  TrendingUp,
 } from 'lucide-react'
 import { collection, collectionGroup, onSnapshot, type Timestamp } from 'firebase/firestore'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -316,9 +316,49 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
 
   const programadas = filtradas.length
   const reportaron = filtradas.filter((f) => f.estado === 'Reportó').length
-  const pendientes = filtradas.filter((f) => f.estado === 'Pendiente').length
   const noReportaron = filtradas.filter((f) => f.estado === 'No reportó').length
   const porcentaje = programadas > 0 ? Math.round((reportaron / programadas) * 100) : 0
+
+  function porcentajeReporteEnRango(desde: string, hasta: string): number {
+    const rows = filasEnRango(desde, hasta).filter((f) => {
+      const matchEquipo = equipo === 'Todas' || f.equipo === equipo
+      const matchTipoCurso = tipoCurso === 'Todos' || f.tipoCurso === tipoCurso
+      return matchEquipo && matchTipoCurso
+    })
+    if (rows.length === 0) return 0
+    return Math.round((rows.filter((f) => f.estado === 'Reportó').length / rows.length) * 100)
+  }
+
+  const tendencia = useMemo(() => {
+    const diasPeriodo = rangoActivo
+      ? Math.round((new Date(rangoHasta).getTime() - new Date(rangoDesde).getTime()) / 86_400_000) + 1
+      : 7
+    const actualHasta = rangoActivo ? rangoHasta : todayIso()
+    const actualDesde = rangoActivo ? rangoDesde : addDays(todayIso(), -(diasPeriodo - 1))
+    const anteriorHasta = addDays(actualDesde, -1)
+    const anteriorDesde = addDays(anteriorHasta, -(diasPeriodo - 1))
+
+    const actual = porcentajeReporteEnRango(actualDesde, actualHasta)
+    const anterior = porcentajeReporteEnRango(anteriorDesde, anteriorHasta)
+    return { actual, anterior, delta: actual - anterior }
+  }, [rangoActivo, rangoDesde, rangoHasta, equipo, tipoCurso, inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances])
+
+  const equipoMenorCumplimiento = useMemo((): { equipo: string; porcentaje: number } | null => {
+    const equiposDisponibles = ['Colombia', 'USA']
+    const candidatos = equiposDisponibles.flatMap((eq) => {
+      const rows = filasFecha.filter((f) => {
+        const matchTipoCurso = tipoCurso === 'Todos' || f.tipoCurso === tipoCurso
+        return f.equipo === eq && matchTipoCurso
+      })
+      if (rows.length === 0) return []
+      const pct = Math.round((rows.filter((f) => f.estado === 'Reportó').length / rows.length) * 100)
+      return [{ equipo: eq, porcentaje: pct }]
+    })
+    return candidatos.reduce<{ equipo: string; porcentaje: number } | null>(
+      (peor, cur) => (!peor || cur.porcentaje < peor.porcentaje ? cur : peor),
+      null,
+    )
+  }, [filasFecha, tipoCurso])
 
   const leccionesPorSemana = useMemo(() => {
     const semanaActualInicio = inicioSemanaLunes(todayIso())
@@ -418,10 +458,21 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             <div className="group rounded-2xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
               <div className="mb-2 flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
-                <CalendarDays className="h-4 w-4" />
-                <p className="text-xs font-medium tracking-wide">Programadas</p>
+                <TrendingUp className="h-4 w-4" />
+                <p className="text-xs font-medium tracking-wide">Tendencia vs. período anterior</p>
               </div>
-              <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">{programadas}</p>
+              <p
+                className={`text-3xl font-bold tabular-nums ${
+                  tendencia.delta > 0
+                    ? 'text-emerald-700 dark:text-emerald-400'
+                    : tendencia.delta < 0
+                      ? 'text-red-700 dark:text-red-400'
+                      : 'text-gray-900 dark:text-gray-100'
+                }`}
+              >
+                {tendencia.delta > 0 ? '+' : ''}
+                {tendencia.delta}%
+              </p>
             </div>
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 transition-shadow hover:shadow-md dark:border-emerald-500/10 dark:bg-emerald-500/10">
               <div className="mb-2 flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
@@ -433,9 +484,14 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
             <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5 transition-shadow hover:shadow-md dark:border-amber-500/10 dark:bg-amber-500/10">
               <div className="mb-2 flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                 <AlarmClockCheck className="h-4 w-4" />
-                <p className="text-xs font-medium tracking-wide">Pendientes</p>
+                <p className="text-xs font-medium tracking-wide">Menor cumplimiento</p>
               </div>
-              <p className="text-3xl font-bold tabular-nums text-amber-700 dark:text-amber-400">{pendientes}</p>
+              <p className="text-3xl font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                {equipoMenorCumplimiento ? `${equipoMenorCumplimiento.porcentaje}%` : '–'}
+              </p>
+              {equipoMenorCumplimiento && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{equipoMenorCumplimiento.equipo}</p>
+              )}
             </div>
             <div className="rounded-2xl border border-red-100 bg-red-50 p-5 transition-shadow hover:shadow-md dark:border-red-500/10 dark:bg-red-500/10">
               <div className="mb-2 flex items-center gap-1.5 text-red-600 dark:text-red-400">
@@ -573,20 +629,20 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-            <div className="overflow-x-auto">
+            <div className="max-h-[70vh] overflow-auto">
               <table className="w-full min-w-[900px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/60 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950/40 dark:text-gray-500">
-                    <th className="px-5 py-3 font-semibold">Colaborador</th>
-                    <th className="px-5 py-3 font-semibold">Equipo</th>
-                    <th className="px-5 py-3 font-semibold">Tipo de curso</th>
-                    <th className="px-5 py-3 font-semibold">Curso</th>
-                    <th className="px-5 py-3 font-semibold">Fecha</th>
-                    <th className="px-5 py-3 font-semibold">Horario</th>
-                    <th className="px-5 py-3 font-semibold">Estado</th>
-                    <th className="px-5 py-3 font-semibold">Lecciones</th>
-                    <th className="px-5 py-3 font-semibold">Aprendizaje</th>
-                    <th className="px-5 py-3 font-semibold">Reporte</th>
+                  <tr className="border-b border-gray-100 bg-gray-50 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950 dark:text-gray-500">
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Colaborador</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Equipo</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Tipo de curso</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Curso</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Fecha</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Horario</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Estado</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Lecciones</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Aprendizaje</th>
+                    <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Reporte</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">

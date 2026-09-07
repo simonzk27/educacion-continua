@@ -600,20 +600,20 @@ export default function Horarios() {
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="overflow-x-auto">
+        <div className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead>
-              <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
-                <th className="px-5 py-3 font-semibold">Colaborador</th>
-                <th className="px-5 py-3 font-semibold">Equipo</th>
-                <th className="px-5 py-3 font-semibold">Tipo de curso</th>
-                <th className="px-5 py-3 font-semibold">Curso</th>
-                <th className="px-5 py-3 font-semibold">Días</th>
-                <th className="px-5 py-3 font-semibold">Hora</th>
-                <th className="px-5 py-3 font-semibold">Duración</th>
-                <th className="px-5 py-3 font-semibold">Vigencia</th>
-                <th className="px-5 py-3 font-semibold">Estado</th>
-                <th className="px-5 py-3" />
+              <tr className="border-b border-gray-100 bg-gray-50 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950 dark:text-gray-500">
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Colaborador</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Equipo</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Tipo de curso</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Curso</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Días</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Hora</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Duración</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Vigencia</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Estado</th>
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
