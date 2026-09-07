@@ -114,6 +114,7 @@ export default function ListadoCursos() {
   const [assigningId, setAssigningId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [rolFiltro, setRolFiltro] = useState<RolFiltro>('Todos')
+  const [cursoSearch, setCursoSearch] = useState('')
   const [page, setPage] = useState(1)
 
   const [deleting, setDeleting] = useState<Curso | null>(null)
@@ -158,7 +159,16 @@ export default function ListadoCursos() {
     })
   }, [assignCurso])
 
-  const filtrados = tab === 'Todos los cursos' ? cursos : cursos.filter((c) => c.tipo === tab)
+  const porTab = tab === 'Todos los cursos' ? cursos : cursos.filter((c) => c.tipo === tab)
+  const terminoCurso = cursoSearch.trim().toLowerCase()
+  const filtrados = !terminoCurso
+    ? porTab
+    : porTab.filter(
+        (c) =>
+          c.nombre.toLowerCase().includes(terminoCurso) ||
+          c.categoria.toLowerCase().includes(terminoCurso) ||
+          c.instructor.toLowerCase().includes(terminoCurso),
+      )
 
   function openAssignModal(curso: Curso) {
     setAssignCurso(curso)
@@ -401,6 +411,19 @@ export default function ListadoCursos() {
         ))}
       </div>
 
+      <div className="flex justify-end">
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={cursoSearch}
+            onChange={(e) => setCursoSearch(e.target.value)}
+            placeholder="Buscar por nombre, categoría o instructor..."
+            className="w-full rounded-lg border border-gray-300 py-2 pr-3 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+          />
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
         <div className="max-h-[70vh] overflow-auto">
           <table className="w-full min-w-[800px] text-left text-sm">
@@ -449,7 +472,9 @@ export default function ListadoCursos() {
                   <td colSpan={8} className="px-5 py-10">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Inbox className="h-8 w-8" />
-                      <p className="text-sm">No hay cursos todavía.</p>
+                      <p className="text-sm">
+                        {terminoCurso ? 'No hay cursos que coincidan con la búsqueda.' : 'No hay cursos todavía.'}
+                      </p>
                     </div>
                   </td>
                 </tr>
