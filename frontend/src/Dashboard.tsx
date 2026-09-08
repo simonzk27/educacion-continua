@@ -116,6 +116,16 @@ function normalizar(texto: string): string {
     .toLowerCase()
 }
 
+function inicioMesIso(iso: string): string {
+  const [y, m] = iso.split('-').map(Number)
+  return dateToIso(new Date(y, m - 1, 1))
+}
+
+function finMesIso(iso: string): string {
+  const [y, m] = iso.split('-').map(Number)
+  return dateToIso(new Date(y, m, 0))
+}
+
 function formatFechaCorta(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
@@ -160,6 +170,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
   const [estado, setEstado] = useState('Todos')
   const [usuarioFiltro, setUsuarioFiltro] = useState('Todos')
   const [busquedaGeneral, setBusquedaGeneral] = useState('')
+  const [mostrarTodo, setMostrarTodo] = useState(false)
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [cursosPorId, setCursosPorId] = useState<Record<string, Curso>>({})
@@ -297,7 +308,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
             userId: insc.userId,
             colaborador: user.nombre,
             equipo: user.equipo,
-            tipoCurso: user.tipoCurso,
+            tipoCurso: curso.tipo,
             curso: curso.nombre,
             horaMin: horaAMin(horario.hora as string),
             horario: formatHora(horario.hora),
@@ -315,10 +326,30 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
   const rangoActivo = Boolean(rangoDesde && rangoHasta)
 
   const filasFecha = useMemo(() => {
-    const desde = rangoActivo ? rangoDesde : addDays(todayIso(), -1825)
-    const hasta = rangoActivo ? rangoHasta : addDays(todayIso(), 1825)
+    let desde: string
+    let hasta: string
+    if (rangoActivo) {
+      desde = rangoDesde
+      hasta = rangoHasta
+    } else if (mostrarTodo) {
+      desde = addDays(todayIso(), -1825)
+      hasta = addDays(todayIso(), 1825)
+    } else {
+      desde = inicioMesIso(todayIso())
+      hasta = finMesIso(todayIso())
+    }
     return filasEnRango(desde, hasta)
-  }, [rangoActivo, rangoDesde, rangoHasta, inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances])
+  }, [
+    rangoActivo,
+    rangoDesde,
+    rangoHasta,
+    mostrarTodo,
+    inscripciones,
+    horariosPorKey,
+    usuariosPorId,
+    cursosPorId,
+    avances,
+  ])
 
   const terminoGeneral = normalizar(busquedaGeneral.trim())
   const filtradas = filasFecha.filter((f) => {
@@ -437,7 +468,9 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
               ? 'Matriz de colaboradores y cursos'
               : rangoActivo
                 ? `Del ${formatFechaCorta(rangoDesde)} al ${formatFechaCorta(rangoHasta)}`
-                : 'Todas las sesiones programadas'}
+                : mostrarTodo
+                  ? 'Todas las sesiones programadas'
+                  : 'Sesiones del mes actual'}
           </p>
         </div>
       </div>
@@ -655,6 +688,30 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   )}
                 </div>
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  &nbsp;
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setMostrarTodo((v) => !v)}
+                  disabled={rangoActivo}
+                  title={
+                    rangoActivo
+                      ? 'Ya hay un rango de fechas personalizado activo'
+                      : mostrarTodo
+                        ? 'Mostrando todo el historial'
+                        : 'Por defecto solo se muestra el mes actual'
+                  }
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    mostrarTodo
+                      ? 'border-blue-600 bg-blue-600 text-white dark:border-indigo-500 dark:bg-indigo-500'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  Mostrar todo
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -665,6 +722,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   setUsuarioFiltro('Todos')
                   setEstado('Todos')
                   setBusquedaGeneral('')
+                  setMostrarTodo(false)
                 }}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >

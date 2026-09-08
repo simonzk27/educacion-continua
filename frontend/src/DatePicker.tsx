@@ -49,6 +49,7 @@ export default function DatePicker({
   placeholder = 'Seleccionar fecha',
 }: DatePickerProps) {
   const [open, setOpen] = useState(false)
+  const [yearPickerOpen, setYearPickerOpen] = useState(false)
   const [viewDate, setViewDate] = useState(() => parseIso(value) ?? new Date())
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -64,11 +65,17 @@ export default function DatePicker({
   function toggleOpen() {
     if (disabled) return
     if (!open) setViewDate(parseIso(value) ?? new Date())
+    setYearPickerOpen(false)
     setOpen((o) => !o)
   }
 
   function irMes(delta: number) {
     setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1))
+  }
+
+  function seleccionarAnio(anio: number) {
+    setViewDate((d) => new Date(anio, d.getMonth(), 1))
+    setYearPickerOpen(false)
   }
 
   function seleccionar(fecha: string) {
@@ -105,7 +112,13 @@ export default function DatePicker({
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-sm font-bold capitalize">{mesLabel}</span>
+            <button
+              type="button"
+              onClick={() => setYearPickerOpen((o) => !o)}
+              className="rounded-lg px-2 py-1 text-sm font-bold capitalize transition-colors hover:bg-white/20"
+            >
+              {mesLabel}
+            </button>
             <button
               type="button"
               onClick={() => irMes(1)}
@@ -115,48 +128,69 @@ export default function DatePicker({
             </button>
           </div>
           <div className="p-3.5">
-            <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-              {diasCortos.map((d) => (
-                <span key={d}>{d}</span>
-              ))}
-            </div>
-            <div className="mt-2 grid grid-cols-7 gap-1">
-              {grid.map((fecha, i) => {
-                if (!fecha) return <span key={`pad-${i}`} />
-                const habilitado = (!minDate || fecha >= minDate) && (!maxDate || fecha <= maxDate)
-                const activo = fecha === value
-                const esHoy = fecha === hoy
-                const dayNum = Number(fecha.split('-')[2])
-                return (
+            {yearPickerOpen ? (
+              <div className="grid max-h-56 grid-cols-4 gap-1.5 overflow-y-auto">
+                {Array.from({ length: 24 }, (_, i) => viewDate.getFullYear() - 12 + i).map((anio) => (
                   <button
-                    key={fecha}
+                    key={anio}
                     type="button"
-                    disabled={!habilitado}
-                    onClick={() => seleccionar(fecha)}
-                    className={`relative flex aspect-square items-center justify-center rounded-full text-sm font-medium transition-all ${
-                      activo
-                        ? 'scale-105 bg-blue-600 text-white shadow-md shadow-blue-600/30 dark:bg-indigo-500 dark:shadow-indigo-500/30'
-                        : habilitado
-                          ? 'text-gray-700 hover:scale-105 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
-                          : 'text-gray-300 dark:text-gray-700'
+                    onClick={() => seleccionarAnio(anio)}
+                    className={`rounded-lg py-1.5 text-sm font-medium transition-colors ${
+                      anio === viewDate.getFullYear()
+                        ? 'bg-blue-600 text-white dark:bg-indigo-500'
+                        : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
                     }`}
                   >
-                    {dayNum}
-                    {esHoy && !activo && (
-                      <span className="absolute bottom-1 h-1 w-1 rounded-full bg-blue-500 dark:bg-indigo-400" />
-                    )}
+                    {anio}
                   </button>
-                )
-              })}
-            </div>
-            {hoyHabilitado && (
-              <button
-                type="button"
-                onClick={() => seleccionar(hoy)}
-                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 py-2 text-sm font-medium text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-400 dark:hover:text-indigo-400"
-              >
-                Hoy
-              </button>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                  {diasCortos.map((d) => (
+                    <span key={d}>{d}</span>
+                  ))}
+                </div>
+                <div className="mt-2 grid grid-cols-7 gap-1">
+                  {grid.map((fecha, i) => {
+                    if (!fecha) return <span key={`pad-${i}`} />
+                    const habilitado = (!minDate || fecha >= minDate) && (!maxDate || fecha <= maxDate)
+                    const activo = fecha === value
+                    const esHoy = fecha === hoy
+                    const dayNum = Number(fecha.split('-')[2])
+                    return (
+                      <button
+                        key={fecha}
+                        type="button"
+                        disabled={!habilitado}
+                        onClick={() => seleccionar(fecha)}
+                        className={`relative flex aspect-square items-center justify-center rounded-full text-sm font-medium transition-all ${
+                          activo
+                            ? 'scale-105 bg-blue-600 text-white shadow-md shadow-blue-600/30 dark:bg-indigo-500 dark:shadow-indigo-500/30'
+                            : habilitado
+                              ? 'text-gray-700 hover:scale-105 hover:bg-blue-50 hover:text-blue-600 dark:text-gray-300 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
+                              : 'text-gray-300 dark:text-gray-700'
+                        }`}
+                      >
+                        {dayNum}
+                        {esHoy && !activo && (
+                          <span className="absolute bottom-1 h-1 w-1 rounded-full bg-blue-500 dark:bg-indigo-400" />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                {hoyHabilitado && (
+                  <button
+                    type="button"
+                    onClick={() => seleccionar(hoy)}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 py-2 text-sm font-medium text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-400 dark:hover:text-indigo-400"
+                  >
+                    Hoy
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

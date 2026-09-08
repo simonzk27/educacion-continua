@@ -138,9 +138,11 @@ export default function Tablero({ isAdmin }: TableroProps) {
   }, [])
 
   const progresoPorClave = new Map<string, number>()
+  const avanceExisteSet = new Set<string>()
   avancesLecciones.forEach((a) => {
     const key = `${a.cursoId}_${a.userId}`
     progresoPorClave.set(key, (progresoPorClave.get(key) ?? 0) + a.lecciones)
+    avanceExisteSet.add(key)
   })
 
   async function handleConfirmarCompletado(userId: string, cursoId: string) {
@@ -334,9 +336,19 @@ export default function Tablero({ isAdmin }: TableroProps) {
                         )
                       }
 
-                      const confirmado = insc.completado && insc.confirmado
-                      const pendienteConfirmar = insc.completado && !insc.confirmado
-                      const puedeConfirmar = isAdmin && pendienteConfirmar && c.tipo === 'Educación Continua'
+                      const clave = `${c.id}_${p.id}`
+                      const tieneAvance = avanceExisteSet.has(clave)
+                      const esEC = c.tipo === 'Educación Continua'
+                      const totalCurso = c.duracionValor > 0 ? c.duracionValor : 1
+                      const leccionesHechas = progresoPorClave.get(clave) ?? 0
+                      const ajustadoPorAdmin = insc.completado === true && insc.confirmado === true
+                      const completadoReal =
+                        ajustadoPorAdmin || (esEC ? tieneAvance : leccionesHechas >= totalCurso)
+
+                      const confirmado =
+                        ajustadoPorAdmin || (esEC ? tieneAvance && insc.confirmado : completadoReal)
+                      const pendienteConfirmar = esEC && tieneAvance && !insc.confirmado
+                      const puedeConfirmar = isAdmin && pendienteConfirmar && esEC
 
                       const celda = (
                         <span
@@ -358,11 +370,11 @@ export default function Tablero({ isAdmin }: TableroProps) {
                         </span>
                       )
 
-                      const totalCurso = c.duracionValor > 0 ? c.duracionValor : 1
-                      const leccionesHechas = progresoPorClave.get(`${c.id}_${p.id}`) ?? 0
-                      const pct = insc.completado
+                      const pct = ajustadoPorAdmin
                         ? 100
-                        : Math.min(100, Math.round((leccionesHechas / totalCurso) * 100))
+                        : esEC
+                          ? (tieneAvance ? 100 : 0)
+                          : Math.min(100, Math.round((leccionesHechas / totalCurso) * 100))
                       const barColor =
                         pct >= 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-700'
 

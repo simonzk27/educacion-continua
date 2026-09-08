@@ -92,7 +92,7 @@ const emptyForm = {
 }
 
 type RolUsuario = 'Admin' | 'Usuario'
-type RolFiltro = 'Todos' | RolUsuario
+type AsignacionFiltro = 'Todos' | 'Asignado' | 'No asignado'
 
 type Usuario = {
   id: string
@@ -102,7 +102,7 @@ type Usuario = {
 }
 
 const firestoreToRol: Record<string, RolUsuario> = { admin: 'Admin', usuario: 'Usuario' }
-const rolFiltros: RolFiltro[] = ['Todos', 'Admin', 'Usuario']
+const asignacionFiltros: AsignacionFiltro[] = ['Todos', 'Asignado', 'No asignado']
 const PAGE_SIZE = 10
 
 export default function ListadoCursos() {
@@ -121,7 +121,7 @@ export default function ListadoCursos() {
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set())
   const [assigningId, setAssigningId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [rolFiltro, setRolFiltro] = useState<RolFiltro>('Todos')
+  const [asignacionFiltro, setAsignacionFiltro] = useState<AsignacionFiltro>('Todos')
   const [cursoSearch, setCursoSearch] = useState('')
   const [page, setPage] = useState(1)
 
@@ -181,7 +181,7 @@ export default function ListadoCursos() {
   function openAssignModal(curso: Curso) {
     setAssignCurso(curso)
     setSearch('')
-    setRolFiltro('Todos')
+    setAsignacionFiltro('Todos')
     setPage(1)
   }
 
@@ -227,10 +227,14 @@ export default function ListadoCursos() {
   }
 
   const usuariosFiltrados = usuarios.filter((u) => {
-    const matchRol = rolFiltro === 'Todos' || u.rol === rolFiltro
-    const term = search.trim().toLowerCase()
-    const matchSearch = !term || u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term)
-    return matchRol && matchSearch
+    const asignado = assignedIds.has(u.id)
+    const matchAsignacion =
+      asignacionFiltro === 'Todos' ||
+      (asignacionFiltro === 'Asignado' ? asignado : !asignado)
+    const palabras = normalizar(search.trim()).split(/\s+/).filter(Boolean)
+    const texto = normalizar(`${u.nombre} ${u.email}`)
+    const matchSearch = palabras.every((p) => texto.includes(p))
+    return matchAsignacion && matchSearch
   })
   const totalPages = Math.max(1, Math.ceil(usuariosFiltrados.length / PAGE_SIZE))
   const paginaActual = Math.min(page, totalPages)
@@ -871,13 +875,13 @@ export default function ListadoCursos() {
                 />
               </div>
               <Select
-                value={rolFiltro}
+                value={asignacionFiltro}
                 onChange={(v) => {
-                  setRolFiltro(v as RolFiltro)
+                  setAsignacionFiltro(v as AsignacionFiltro)
                   setPage(1)
                 }}
-                className="w-36"
-                options={rolFiltros}
+                className="w-44"
+                options={asignacionFiltros}
               />
             </div>
 

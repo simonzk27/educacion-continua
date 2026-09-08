@@ -8,6 +8,7 @@ import {
   Users,
   BookOpen,
   BellRing,
+  CalendarCog,
 } from 'lucide-react'
 
 export type ViewId =
@@ -19,6 +20,7 @@ export type ViewId =
   | 'colaboradores'
   | 'listado-cursos'
   | 'alertas'
+  | 'ajustar-completado'
 
 export type NavItem = {
   id: ViewId
@@ -55,6 +57,7 @@ export const navSections: NavSection[] = [
     items: [
       { id: 'colaboradores', label: 'Colaboradores', icon: Users },
       { id: 'alertas', label: 'Alertas', icon: BellRing },
+      { id: 'ajustar-completado', label: 'Ajustar fecha completado', icon: CalendarCog },
     ],
   },
   {

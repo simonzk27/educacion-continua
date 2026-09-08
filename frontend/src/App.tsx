@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { signOut } from 'firebase/auth'
 import Login from './Login'
@@ -9,7 +9,7 @@ import ComingSoon from './ComingSoon'
 import { useTheme } from './useTheme'
 import { useAuth } from './useAuth'
 import { auth } from './firebase'
-import { navLabels, type ViewId } from './nav'
+import { navSections, navLabels, type ViewId } from './nav'
 
 const Dashboard = lazy(() => import('./Dashboard'))
 const Horarios = lazy(() => import('./Horarios'))
@@ -17,6 +17,7 @@ const InformeSemanal = lazy(() => import('./InformeSemanal'))
 const Colaboradores = lazy(() => import('./Colaboradores'))
 const ListadoCursos = lazy(() => import('./ListadoCursos'))
 const Alertas = lazy(() => import('./Alertas'))
+const AjustarCompletado = lazy(() => import('./AjustarCompletado'))
 
 function ViewFallback() {
   return (
@@ -31,6 +32,10 @@ function App() {
   const [activeView, setActiveView] = useState<ViewId>('mi-panel')
   const [collapsed, setCollapsed] = useState(false)
   const { theme, toggleTheme } = useTheme()
+
+  useEffect(() => {
+    setActiveView('mi-panel')
+  }, [firebaseUser?.uid])
 
   if (loading) {
     return (
@@ -47,8 +52,13 @@ function App() {
 
   const user = role
 
+  const vistaPermitida =
+    role === 'Admin' ||
+    navSections.some((s) => !s.adminOnly && s.items.some((i) => i.id === activeView))
+  const vista = vistaPermitida ? activeView : 'mi-panel'
+
   let content: React.ReactNode
-  if (activeView === 'mi-panel') {
+  if (vista === 'mi-panel') {
     content = (
       <MiPanel
         nombre={nombre}
@@ -57,22 +67,24 @@ function App() {
         onRegistrarAvance={() => setActiveView('registrar-avance')}
       />
     )
-  } else if (activeView === 'registrar-avance') {
+  } else if (vista === 'registrar-avance') {
     content = <RegistrarAvance userId={firebaseUser.uid} />
-  } else if (activeView === 'dashboard-hoy') {
+  } else if (vista === 'dashboard-hoy') {
     content = <Dashboard isAdmin={role === 'Admin'} />
-  } else if (activeView === 'horarios') {
+  } else if (vista === 'horarios') {
     content = <Horarios />
-  } else if (activeView === 'informe-semanal') {
+  } else if (vista === 'informe-semanal') {
     content = <InformeSemanal />
-  } else if (activeView === 'colaboradores') {
+  } else if (vista === 'colaboradores') {
     content = <Colaboradores />
-  } else if (activeView === 'listado-cursos') {
+  } else if (vista === 'listado-cursos') {
     content = <ListadoCursos />
-  } else if (activeView === 'alertas') {
+  } else if (vista === 'alertas') {
     content = <Alertas userId={firebaseUser.uid} />
+  } else if (vista === 'ajustar-completado') {
+    content = <AjustarCompletado />
   } else {
-    content = <ComingSoon title={navLabels[activeView]} />
+    content = <ComingSoon title={navLabels[vista]} />
   }
 
   return (

@@ -350,10 +350,16 @@ export default function Horarios() {
   )
   const cursosOpciones = useMemo(() => [...new Set(filas.map((f) => f.curso))].sort(), [filas])
 
-  const terminoColaboradorLista = normalizar(colaboradorBusqueda.trim())
-  const usuariosListaFiltrados = terminoColaboradorLista
-    ? usuarios.filter((u) => normalizar(u.nombre).includes(terminoColaboradorLista))
-    : usuarios
+  const palabrasColaboradorLista = normalizar(colaboradorBusqueda.trim())
+    .split(/\s+/)
+    .filter(Boolean)
+  const usuariosListaFiltrados =
+    palabrasColaboradorLista.length === 0
+      ? usuarios
+      : usuarios.filter((u) => {
+          const texto = normalizar(u.nombre)
+          return palabrasColaboradorLista.every((p) => texto.includes(p))
+        })
 
   const filtradas = filas.filter((f) => {
     const matchEquipo = equipo === 'Todas' || f.equipo === equipo
@@ -896,7 +902,7 @@ export default function Horarios() {
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+          <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
               <div className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-indigo-500/10 dark:text-indigo-400">

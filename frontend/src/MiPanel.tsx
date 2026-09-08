@@ -49,11 +49,6 @@ type Curso = {
   duracionUnidad: string
 }
 
-type InscripcionInfo = {
-  completado: boolean
-  confirmado: boolean
-}
-
 type Horario = {
   cursoId: string
   modo: Modo
@@ -167,22 +162,9 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
     return onSnapshot(q, aplicarCursos)
   }, [])
 
-  const [inscripcionesPorCurso, setInscripcionesPorCurso] = useState<Record<string, InscripcionInfo>>({})
-
   useEffect(() => {
     function aplicarSnapshot(snap: QuerySnapshot) {
       setCursoIds(snap.docs.map((d) => d.ref.parent.parent?.id).filter((id): id is string => !!id))
-      const map: Record<string, InscripcionInfo> = {}
-      snap.docs.forEach((d) => {
-        const cursoId = d.ref.parent.parent?.id
-        if (!cursoId) return
-        const data = d.data()
-        map[cursoId] = {
-          completado: data.completado === true,
-          confirmado: data.confirmado !== false,
-        }
-      })
-      setInscripcionesPorCurso(map)
       setLoading(false)
     }
 
@@ -191,6 +173,23 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
       .then(aplicarSnapshot)
       .catch(() => {})
     return onSnapshot(q, aplicarSnapshot, () => setLoading(false))
+  }, [userId])
+
+  const [avancesTodos, setAvancesTodos] = useState<{ cursoId: string; lecciones: number }[]>([])
+
+  useEffect(() => {
+    const q = query(collection(db, 'avances'), where('userId', '==', userId))
+    return onSnapshot(q, (snap) => {
+      setAvancesTodos(
+        snap.docs.map((d) => {
+          const data = d.data()
+          return {
+            cursoId: (data.cursoId as string) ?? '',
+            lecciones: (data.lecciones as number) ?? 0,
+          }
+        }),
+      )
+    })
   }, [userId])
 
   useEffect(() => {
@@ -242,6 +241,14 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
     })
   }, [userId])
 
+  const leccionesPorCursoActuales = useMemo(() => {
+    const map = new Map<string, number>()
+    avancesTodos.forEach((a) => {
+      map.set(a.cursoId, (map.get(a.cursoId) ?? 0) + a.lecciones)
+    })
+    return map
+  }, [avancesTodos])
+
   const cursosActuales = useMemo(() => {
     return cursoIds
       .map((cursoId) => {
@@ -251,15 +258,23 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
         if (!horario || !horario.hora) {
           return { id: cursoId, nombre: curso.nombre, progreso: null as number | null, estado: 'Sin horario asignado' }
         }
-        const completadas = ocurrenciasEntre(horario, '0001-01-01', todayIso()).length
+        if (curso.tipo === 'Educación Continua') {
+          const registrado = leccionesPorCursoActuales.has(cursoId)
+          return {
+            id: cursoId,
+            nombre: curso.nombre,
+            progreso: registrado ? 100 : 0,
+            estado: registrado ? 'Completado' : 'En progreso',
+          }
+        }
         const total = curso.duracionValor > 0 ? curso.duracionValor : 1
-        const progreso = Math.min(100, Math.round((completadas / total) * 100))
-        const estado =
-          completadas === 0 ? 'Asignado · Aún sin sesiones' : progreso >= 100 ? 'Completado' : 'En progreso'
+        const hechas = leccionesPorCursoActuales.get(cursoId) ?? 0
+        const progreso = Math.min(100, Math.round((hechas / total) * 100))
+        const estado = hechas === 0 ? 'Asignado · Aún sin avances' : progreso >= 100 ? 'Completado' : 'En progreso'
         return { id: cursoId, nombre: curso.nombre, progreso, estado }
       })
       .filter((c): c is NonNullable<typeof c> => c !== null)
-  }, [cursoIds, cursosPorId, horariosPorCurso])
+  }, [cursoIds, cursosPorId, horariosPorCurso, leccionesPorCursoActuales])
 
   const proximasSesiones = useMemo(() => {
     const hoy = todayIso()
@@ -292,6 +307,12 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
   const misCursos = cursoIds
     .map((id) => cursosPorId[id])
     .filter((c): c is Curso => !!c)
+
+  function estaFinalizado(c: Curso): boolean {
+    if (c.tipo === 'Educación Continua') return leccionesPorCursoActuales.has(c.id)
+    const total = c.duracionValor > 0 ? c.duracionValor : 1
+    return (leccionesPorCursoActuales.get(c.id) ?? 0) >= total
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -363,8 +384,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                   </tr>
                 ) : (
                   misCursos.map((c) => {
-                    const insc = inscripcionesPorCurso[c.id]
-                    const finalizado = insc?.completado === true && insc?.confirmado === true
+                    const finalizado = estaFinalizado(c)
                     return (
                       <tr key={c.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                         <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">{c.nombre}</td>

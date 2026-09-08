@@ -61,7 +61,6 @@ const emptyForm = {
   fecha: '',
   horaInicio: '',
   horaFin: '',
-  leccionInicial: '',
   leccionFinal: '',
   aprendizaje: '',
   comentario: '',
@@ -200,9 +199,11 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
       where('userId', '==', userId),
       where('cursoId', '==', selectedCursoId),
     )
-    getDocs(q)
-      .then((snap) => setAvanceExistenteEC(!snap.empty))
-      .catch(() => setAvanceExistenteEC(false))
+    return onSnapshot(
+      q,
+      (snap) => setAvanceExistenteEC(!snap.empty),
+      () => setAvanceExistenteEC(false),
+    )
   }, [selectedCursoId, esEducacionContinua, userId])
 
   const opcionesCursos = useMemo(() => {
@@ -249,38 +250,23 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
     return { total, cubiertas, libres }
   }, [cursoSeleccionado, rangosRegistrados])
 
+  const cursoCompletado = leccionesInfo.total > 0 && leccionesInfo.libres.length === 0
+
+  const proximaLeccion = leccionesInfo.libres.length > 0 ? leccionesInfo.libres[0] : null
+
   const opcionesLeccionFinal = useMemo(() => {
-    const inicial = Number(form.leccionInicial)
-    if (!form.leccionInicial || !Number.isInteger(inicial) || leccionesInfo.cubiertas.has(inicial)) return []
+    if (proximaLeccion === null) return []
     const out: number[] = []
-    for (let i = inicial; i <= leccionesInfo.total; i++) {
+    for (let i = proximaLeccion; i <= leccionesInfo.total; i++) {
       if (leccionesInfo.cubiertas.has(i)) break
       out.push(i)
     }
     return out
-  }, [form.leccionInicial, leccionesInfo])
+  }, [proximaLeccion, leccionesInfo])
 
   function handleClickLeccion(n: number) {
-    if (leccionesInfo.cubiertas.has(n)) return
-    const inicial = Number(form.leccionInicial)
-    const eligiendoFinal = form.leccionInicial !== '' && form.leccionFinal === ''
-
-    if (!eligiendoFinal) {
-      setForm({ ...form, leccionInicial: String(n), leccionFinal: '' })
-      return
-    }
-    if (n === inicial) {
-      setForm({ ...form, leccionInicial: '', leccionFinal: '' })
-      return
-    }
-    if (n > inicial) {
-      const alcanzable = opcionesLeccionFinal.includes(n)
-      if (alcanzable) {
-        setForm({ ...form, leccionFinal: String(n) })
-        return
-      }
-    }
-    setForm({ ...form, leccionInicial: String(n), leccionFinal: '' })
+    if (!opcionesLeccionFinal.includes(n)) return
+    setForm({ ...form, leccionFinal: String(n) })
   }
 
   const sesionObjetivo = useMemo(() => {
@@ -350,16 +336,17 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
   }, [selectedCursoId, esEducacionContinua, userId])
 
   function validar(): string | null {
+    if (cursoCompletado) return 'Ya completaste todas las lecciones de este curso.'
     if (!sesionObjetivo) return 'No tenés una sesión programada para registrar avance.'
     if (!form.horaInicio) return 'Completá la hora de inicio.'
     if (!form.horaFin) return 'Completá la hora de finalización.'
     if (form.horaFin <= form.horaInicio) return 'La hora de finalización debe ser posterior a la hora de inicio.'
-    if (!form.leccionInicial || !form.leccionFinal) return 'Indicá lección inicial y lección final.'
-    const inicial = Number(form.leccionInicial)
+    if (proximaLeccion === null || !form.leccionFinal) return 'Indicá hasta qué lección llegaste.'
+    const inicial = proximaLeccion
     const final = Number(form.leccionFinal)
-    if (!Number.isInteger(inicial) || inicial < 1) return 'La lección inicial debe ser un número entero mayor a 0.'
-    if (!Number.isInteger(final) || final < 1) return 'La lección final debe ser un número entero mayor a 0.'
-    if (final < inicial) return 'La lección final no puede ser menor a la lección inicial.'
+    if (!Number.isInteger(final) || final < inicial) {
+      return 'La lección final no puede ser menor a la próxima lección pendiente.'
+    }
     const solapa = rangosRegistrados.some((r) => rangosSolapan(inicial, final, r.leccionInicial, r.leccionFinal))
     if (solapa) return 'Ya registraste un avance que incluye alguna de estas lecciones.'
     if (!form.aprendizaje.trim()) return 'Contanos tu principal aprendizaje de la sesión.'
@@ -373,11 +360,11 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
       setFormError(err)
       return
     }
-    if (!sesionObjetivo || !selectedCursoId) return
+    if (!sesionObjetivo || !selectedCursoId || proximaLeccion === null) return
     setFormError(null)
     setSubmitting(true)
     try {
-      const leccionInicial = Number(form.leccionInicial)
+      const leccionInicial = proximaLeccion
       const leccionFinal = Number(form.leccionFinal)
       await addDoc(collection(db, 'avances'), {
         userId,
@@ -392,6 +379,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
         comentario: form.comentario.trim() || null,
         creadoEn: serverTimestamp(),
       })
+      setRangosRegistrados((prev) => [...prev, { leccionInicial, leccionFinal }])
 
       const curso = cursosPorId[selectedCursoId]
       if (curso && curso.duracionValor > 0) {
@@ -516,7 +504,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
             <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
               {avanceExistenteEC === null ? (
                 <p className="text-sm text-gray-400 dark:text-gray-500">Cargando...</p>
-              ) : avanceExistenteEC || inscripcionSeleccionada?.completado ? (
+              ) : avanceExistenteEC ? (
                 <div className="flex flex-col gap-1">
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     Ya registraste tu avance para este curso.
@@ -594,6 +582,19 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                   )}
                 </form>
               )}
+            </div>
+          ) : cursoCompletado ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Ya completaste todas las lecciones de este curso.
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {inscripcionSeleccionada?.confirmado
+                    ? 'Completado y confirmado.'
+                    : 'Registro completo. Pendiente de confirmación por un administrador.'}
+                </p>
+              </div>
             </div>
           ) : (
             <>
@@ -685,10 +686,6 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                   <p className="text-sm text-gray-400 dark:text-gray-500">
                     Este curso no tiene sesiones configuradas todavía.
                   </p>
-                ) : leccionesInfo.libres.length === 0 ? (
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                    Ya registraste todas las lecciones de este curso.
-                  </p>
                 ) : (
                   <div>
                     <div className="mb-3 flex items-center justify-between">
@@ -696,16 +693,14 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                         Lecciones de esta sesión <span className="text-red-500">*</span>
                       </label>
                       <span className="text-xs text-gray-400 dark:text-gray-500">
-                        {form.leccionInicial && form.leccionFinal
-                          ? `Seleccionado: ${form.leccionInicial}–${form.leccionFinal}`
-                          : form.leccionInicial
-                            ? `Inicio: ${form.leccionInicial} · elegí el final`
-                            : ''}
+                        {form.leccionFinal
+                          ? `Seleccionado: ${proximaLeccion}–${form.leccionFinal}`
+                          : `Próxima lección: ${proximaLeccion}`}
                       </span>
                     </div>
                     <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
-                      Tocá la lección donde empezaste y luego la lección donde terminaste. Las lecciones en gris ya
-                      fueron registradas antes.
+                      Empezás automáticamente desde la lección {proximaLeccion}. Tocá hasta dónde llegaste. Las
+                      lecciones en gris ya fueron registradas antes.
                     </p>
                     <div className="flex flex-col gap-3">
                       {(capitulosInfo.length > 0
@@ -720,21 +715,18 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                           )}
                           <div className="flex flex-wrap gap-1.5">
                             {Array.from({ length: cap.fin - cap.inicio + 1 }, (_, i) => cap.inicio + i).map((n) => {
-                              const bloqueada = leccionesInfo.cubiertas.has(n)
-                              const inicial = Number(form.leccionInicial)
+                              const seleccionable = opcionesLeccionFinal.includes(n)
                               const final = Number(form.leccionFinal)
                               const enRango =
-                                form.leccionInicial !== '' &&
-                                form.leccionFinal !== '' &&
-                                n >= inicial &&
-                                n <= final
-                              const esInicioSolo = form.leccionInicial !== '' && n === inicial && form.leccionFinal === ''
+                                form.leccionFinal !== '' && proximaLeccion !== null && n >= proximaLeccion && n <= final
+                              const esProxima = n === proximaLeccion && form.leccionFinal === ''
                               let estilo =
-                                'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-indigo-400'
-                              if (bloqueada) {
+                                'cursor-not-allowed border-gray-100 bg-gray-100 text-gray-300 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600'
+                              if (seleccionable) {
                                 estilo =
-                                  'cursor-not-allowed border-gray-100 bg-gray-100 text-gray-300 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-600'
-                              } else if (enRango || esInicioSolo) {
+                                  'border-gray-200 bg-white text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:border-indigo-400'
+                              }
+                              if (enRango || esProxima) {
                                 estilo =
                                   'border-blue-600 bg-blue-600 text-white dark:border-indigo-500 dark:bg-indigo-500'
                               }
@@ -742,7 +734,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                                 <button
                                   key={n}
                                   type="button"
-                                  disabled={bloqueada}
+                                  disabled={!seleccionable}
                                   onClick={() => handleClickLeccion(n)}
                                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition-colors ${estilo}`}
                                 >
