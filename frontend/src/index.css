@@ -56,3 +56,31 @@ body,
   height: 100%;
   margin: 0;
 }
+
+* {
+  scrollbar-color: rgb(203 213 225) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(203 213 225);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.dark * {
+  scrollbar-color: rgb(55 65 81) transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background-color: rgb(55 65 81);
+}

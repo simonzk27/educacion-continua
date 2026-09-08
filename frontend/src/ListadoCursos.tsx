@@ -35,6 +35,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import Select from './Select'
 
 type Estado = 'Activo' | 'Inactivo' | 'Próximo'
 type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
@@ -453,7 +454,9 @@ export default function ListadoCursos() {
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Duración</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Inscritos</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Estado</th>
-                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950" />
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 text-right font-semibold dark:bg-gray-950">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -756,20 +759,13 @@ export default function ListadoCursos() {
                     <label htmlFor="duracionUnidad" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Unidad
                     </label>
-                    <select
+                    <Select
                       id="duracionUnidad"
                       value={form.duracionUnidad}
-                      onChange={(e) =>
-                        setForm({ ...form, duracionUnidad: e.target.value as DuracionUnidad })
-                      }
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    >
-                      {duracionUnidades.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => setForm({ ...form, duracionUnidad: v as DuracionUnidad })}
+                      className="mt-1"
+                      options={duracionUnidades}
+                    />
                   </div>
                 </div>
               )}
@@ -874,20 +870,15 @@ export default function ListadoCursos() {
                   className="w-full rounded-lg border border-gray-300 py-2 pr-3 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
-              <select
+              <Select
                 value={rolFiltro}
-                onChange={(e) => {
-                  setRolFiltro(e.target.value as RolFiltro)
+                onChange={(v) => {
+                  setRolFiltro(v as RolFiltro)
                   setPage(1)
                 }}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-              >
-                {rolFiltros.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                className="w-36"
+                options={rolFiltros}
+              />
             </div>
 
             <div

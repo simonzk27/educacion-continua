@@ -2,6 +2,7 @@ import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Search, Check, X, TriangleAlert, Inbox } from 'lucide-react'
 import { collection, collectionGroup, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, type Timestamp } from 'firebase/firestore'
 import { db } from './firebase'
+import Select from './Select'
 
 type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
 
@@ -188,48 +189,30 @@ export default function Tablero({ isAdmin }: TableroProps) {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Equipo</label>
-          <select
+          <Select
             value={equipoFiltro}
-            onChange={(e) => setEquipoFiltro(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-          >
-            <option value="Todos">Todos</option>
-            {equiposOpciones.map((eq) => (
-              <option key={eq} value={eq}>
-                {eq}
-              </option>
-            ))}
-          </select>
+            onChange={setEquipoFiltro}
+            className="w-36"
+            options={['Todos', ...equiposOpciones]}
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Tipo de curso</label>
-          <select
+          <Select
             value={tipoCursoFiltro}
-            onChange={(e) => setTipoCursoFiltro(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-          >
-            <option value="Todos">Todos</option>
-            {tiposCursoOpciones.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={setTipoCursoFiltro}
+            className="w-44"
+            options={['Todos', ...tiposCursoOpciones]}
+          />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Curso</label>
-          <select
+          <Select
             value={cursoFiltro}
-            onChange={(e) => setCursoFiltro(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-          >
-            <option value="Todos">Todos</option>
-            {cursos.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
+            onChange={setCursoFiltro}
+            className="w-44"
+            options={[{ value: 'Todos', label: 'Todos' }, ...cursos.map((c) => ({ value: c.id, label: c.nombre }))]}
+          />
         </div>
         <button
           type="button"

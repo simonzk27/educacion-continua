@@ -10,10 +10,13 @@ import {
   Inbox,
   BookOpen,
   CalendarDays,
+  Search,
 } from 'lucide-react'
 import { collection, collectionGroup, doc, onSnapshot, orderBy, query, setDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import { addDays, ocurrenciasEntre, formatFechaSesion } from './scheduleUtils'
+import Select from './Select'
+import TimePicker from './TimePicker'
 
 type Equipo = 'Colombia' | 'USA'
 type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia'
@@ -93,6 +96,13 @@ function formatHora(hora: string | null): string {
   const suffix = h >= 12 ? 'p.m.' : 'a.m.'
   const h12 = h % 12 === 0 ? 12 : h % 12
   return `${h12}:${mStr} ${suffix}`
+}
+
+function normalizar(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
 }
 
 function iniciales(nombre: string): string {
@@ -175,6 +185,8 @@ export default function Horarios() {
 
   const [vista, setVista] = useState<'tabla' | 'colaborador'>('tabla')
   const [colaboradorVistaId, setColaboradorVistaId] = useState<string | null>(null)
+  const [colaboradorBusqueda, setColaboradorBusqueda] = useState('')
+  const [cursoBusqueda, setCursoBusqueda] = useState('')
 
   const [editing, setEditing] = useState<Fila | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -338,6 +350,11 @@ export default function Horarios() {
   )
   const cursosOpciones = useMemo(() => [...new Set(filas.map((f) => f.curso))].sort(), [filas])
 
+  const terminoColaboradorLista = normalizar(colaboradorBusqueda.trim())
+  const usuariosListaFiltrados = terminoColaboradorLista
+    ? usuarios.filter((u) => normalizar(u.nombre).includes(terminoColaboradorLista))
+    : usuarios
+
   const filtradas = filas.filter((f) => {
     const matchEquipo = equipo === 'Todas' || f.equipo === equipo
     const matchTipoCurso = tipoCurso === 'Todos' || f.tipoCurso === tipoCurso
@@ -392,12 +409,31 @@ export default function Horarios() {
           progreso,
           proxima,
           estadoCurso,
+          fila: f,
         }
       })
       .sort((a, b) => a.curso.localeCompare(b.curso))
   }, [colaboradorVistaId, filas, cursosPorId])
 
+  const terminoCursoBusqueda = normalizar(cursoBusqueda.trim())
+  const cursosColaboradorVistaFiltrados = terminoCursoBusqueda
+    ? cursosColaboradorVista.filter((c) => normalizar(c.curso).includes(terminoCursoBusqueda))
+    : cursosColaboradorVista
+
+  function estaCompletado(f: Fila): boolean {
+    const duracionValor = cursosPorId[f.cursoId]?.duracionValor ?? 0
+    const tieneHorario = f.dias.length > 0 || f.fechas.length > 0
+    if (!tieneHorario || !f.hora || duracionValor <= 0) return false
+    const completadas = ocurrenciasEntre(
+      { modo: f.modo, dias: f.dias, fechas: f.fechas, hora: f.hora, vigenciaInicio: f.vigenciaInicio, vigenciaFin: f.vigenciaFin },
+      '0001-01-01',
+      todayIso(),
+    ).length
+    return completadas >= duracionValor
+  }
+
   function openEditModal(f: Fila) {
+    if (estaCompletado(f)) return
     setEditing(f)
     const horas = f.duracionMin ? Math.floor(f.duracionMin / 60) : 0
     const minutos = f.duracionMin ? f.duracionMin % 60 : 0
@@ -527,74 +563,46 @@ export default function Horarios() {
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Equipo
             </label>
-            <select
-              value={equipo}
-              onChange={(e) => setEquipo(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-            >
-              <option>Todas</option>
-              <option>Colombia</option>
-              <option>USA</option>
-            </select>
+            <Select value={equipo} onChange={setEquipo} className="w-36" options={['Todas', 'Colombia', 'USA']} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Tipo de curso
             </label>
-            <select
+            <Select
               value={tipoCurso}
-              onChange={(e) => setTipoCurso(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-            >
-              <option>Todos</option>
-              <option>Educación Continua</option>
-              <option>Unimetab</option>
-              <option>Academia</option>
-            </select>
+              onChange={setTipoCurso}
+              className="w-44"
+              options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Colaborador
             </label>
-            <select
+            <Select
               value={colaborador}
-              onChange={(e) => setColaborador(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-            >
-              <option>Todos</option>
-              {colaboradoresOpciones.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+              onChange={setColaborador}
+              className="w-44"
+              options={['Todos', ...colaboradoresOpciones]}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Curso
             </label>
-            <select
+            <Select
               value={curso}
-              onChange={(e) => setCurso(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-            >
-              <option>Todos</option>
-              {cursosOpciones.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
+              onChange={setCurso}
+              className="w-44"
+              options={['Todos', ...cursosOpciones]}
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Estado
             </label>
-            <select
-              value={estado}
-              onChange={(e) => setEstado(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-            >
-              <option>Todos</option>
-              <option>Activo</option>
-              <option>Inactivo</option>
-            </select>
+            <Select value={estado} onChange={setEstado} className="w-36" options={['Todos', 'Activo', 'Inactivo']} />
           </div>
         </div>
       </div>
@@ -613,7 +621,9 @@ export default function Horarios() {
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Duración</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Vigencia</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Estado</th>
-                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3" />
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 text-right font-semibold dark:bg-gray-950">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -632,6 +642,7 @@ export default function Horarios() {
               ) : (
                 filtradas.map((f) => {
                   const estadoFila: Estado = f.activo ? 'Activo' : 'Inactivo'
+                  const completado = estaCompletado(f)
                   return (
                     <tr key={f.key}>
                       <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
@@ -668,8 +679,9 @@ export default function Horarios() {
                         <button
                           type="button"
                           onClick={() => openEditModal(f)}
-                          title="Editar horario"
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                          disabled={completado}
+                          title={completado ? 'Curso completado: no se puede modificar el horario' : 'Editar horario'}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
                         >
                           <Settings2 className="h-4 w-4" />
                         </button>
@@ -689,8 +701,33 @@ export default function Horarios() {
             <p className="mb-2 px-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
               Colaboradores
             </p>
+            <div className="relative mb-2">
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={colaboradorBusqueda}
+                onChange={(e) => setColaboradorBusqueda(e.target.value)}
+                placeholder="Buscar colaborador..."
+                className="w-full rounded-lg border border-gray-300 py-1.5 pr-7 pl-8 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+              />
+              {colaboradorBusqueda && (
+                <button
+                  type="button"
+                  onClick={() => setColaboradorBusqueda('')}
+                  title="Limpiar búsqueda"
+                  className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             <div className="flex max-h-[520px] flex-col gap-0.5 overflow-y-auto">
-              {usuarios.map((u) => {
+              {usuariosListaFiltrados.length === 0 ? (
+                <p className="px-1.5 py-3 text-center text-sm text-gray-400 dark:text-gray-500">
+                  Sin resultados.
+                </p>
+              ) : (
+                usuariosListaFiltrados.map((u) => {
                 const activo = u.id === colaboradorVistaId
                 return (
                   <button
@@ -719,24 +756,47 @@ export default function Horarios() {
                       )}
                     </span>
                   </button>
-                )
-              })}
+                  )
+                })
+              )}
             </div>
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <div className="mb-5 flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white dark:bg-indigo-500">
-                {iniciales(usuariosPorId[colaboradorVistaId ?? '']?.nombre ?? '?')}
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {usuariosPorId[colaboradorVistaId ?? '']?.nombre ?? 'Selecciona un colaborador'}
-                </p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  {cursosColaboradorVista.length} curso{cursosColaboradorVista.length === 1 ? '' : 's'} asignado
-                  {cursosColaboradorVista.length === 1 ? '' : 's'}
-                </p>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white dark:bg-indigo-500">
+                  {iniciales(usuariosPorId[colaboradorVistaId ?? '']?.nombre ?? '?')}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {usuariosPorId[colaboradorVistaId ?? '']?.nombre ?? 'Selecciona un colaborador'}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    {cursosColaboradorVista.length} curso{cursosColaboradorVista.length === 1 ? '' : 's'} asignado
+                    {cursosColaboradorVista.length === 1 ? '' : 's'}
+                  </p>
+                </div>
+              </div>
+              <div className="relative w-64">
+                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={cursoBusqueda}
+                  onChange={(e) => setCursoBusqueda(e.target.value)}
+                  placeholder="Buscar curso..."
+                  className="w-full rounded-lg border border-gray-300 py-2 pr-9 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                />
+                {cursoBusqueda && (
+                  <button
+                    type="button"
+                    onClick={() => setCursoBusqueda('')}
+                    title="Limpiar búsqueda"
+                    className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -751,9 +811,14 @@ export default function Horarios() {
                 <Inbox className="h-8 w-8" />
                 <p className="text-sm">No tiene cursos asignados.</p>
               </div>
+            ) : cursosColaboradorVistaFiltrados.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-10 text-gray-400 dark:text-gray-500">
+                <Inbox className="h-8 w-8" />
+                <p className="text-sm">Ningún curso coincide con la búsqueda.</p>
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {cursosColaboradorVista.map((c) => (
+                {cursosColaboradorVistaFiltrados.map((c) => (
                   <div
                     key={c.cursoId}
                     className="rounded-xl border border-gray-100 p-4 transition-shadow hover:shadow-sm dark:border-gray-800"
@@ -778,11 +843,26 @@ export default function Horarios() {
                           </p>
                         </div>
                       </div>
-                      {c.progreso !== null && (
-                        <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
-                          {c.progreso}%
-                        </span>
-                      )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {c.progreso !== null && (
+                          <span className="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                            {c.progreso}%
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(c.fila)}
+                          disabled={c.estadoCurso === 'Completado'}
+                          title={
+                            c.estadoCurso === 'Completado'
+                              ? 'Curso completado: no se puede modificar el horario'
+                              : 'Editar horario'
+                          }
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-indigo-400"
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                     {c.progreso !== null && (
                       <div className="mt-3 h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800">
@@ -937,13 +1017,7 @@ export default function Horarios() {
                     <Clock className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                     Hora
                   </label>
-                  <input
-                    id="hora"
-                    type="time"
-                    value={form.hora}
-                    onChange={(e) => setForm({ ...form, hora: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:[color-scheme:dark]"
-                  />
+                  <TimePicker value={form.hora} onChange={(hora) => setForm({ ...form, hora })} />
                 </div>
                 <div>
                   <label

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { CalendarClock, Clock, CheckCircle2, Inbox } from 'lucide-react'
+import DatePicker from './DatePicker'
+import TimePicker from './TimePicker'
+import Select from './Select'
 import {
   addDoc,
   collection,
@@ -491,20 +494,17 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
               <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                 Selecciona el curso <span className="text-red-500">*</span>
               </label>
-              <select
+              <Select
                 value={selectedCursoId ?? ''}
-                onChange={(e) => setSelectedCursoId(e.target.value || null)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-              >
-                <option value="">Selecciona un curso...</option>
-                {opcionesCursos.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.nombre}
-                    {o.tipo ? ` · ${o.tipo}` : ''}
-                    {o.proxima ? ` · próxima sesión ${formatFechaSesion(o.proxima)}` : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setSelectedCursoId(v || null)}
+                placeholder="Selecciona un curso..."
+                options={opcionesCursos.map((o) => {
+                  const partes = [o.nombre]
+                  if (o.tipo) partes.push(o.tipo)
+                  if (o.proxima) partes.push(`próxima sesión ${formatFechaSesion(o.proxima)}`)
+                  return { value: o.id, label: partes.join(' · ') }
+                })}
+              />
             </div>
           )}
 
@@ -533,11 +533,10 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                     <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                       Fecha <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={formEC.fecha}
-                      onChange={(e) => setFormEC({ ...formEC, fecha: e.target.value })}
-                      className={dateTimeInputClass}
+                      onChange={(fecha) => setFormEC({ ...formEC, fecha })}
+                      minDate={todayIso()}
                     />
                   </div>
 
@@ -637,22 +636,18 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                       <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Hora de inicio <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="time"
+                      <TimePicker
                         value={form.horaInicio}
-                        onChange={(e) => setForm({ ...form, horaInicio: e.target.value })}
-                        className={dateTimeInputClass}
+                        onChange={(horaInicio) => setForm({ ...form, horaInicio })}
                       />
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Hora de fin <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="time"
+                      <TimePicker
                         value={form.horaFin}
-                        onChange={(e) => setForm({ ...form, horaFin: e.target.value })}
-                        className={dateTimeInputClass}
+                        onChange={(horaFin) => setForm({ ...form, horaFin })}
                       />
                     </div>
                   </div>

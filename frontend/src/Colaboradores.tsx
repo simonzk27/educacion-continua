@@ -21,6 +21,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { auth, db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
+import Select from './Select'
 
 type Rol = 'Admin' | 'Usuario'
 type Estado = 'Activo' | 'Inactivo'
@@ -392,7 +393,9 @@ export default function Colaboradores() {
                   Curso asociado
                 </th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Estado</th>
-                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950" />
+                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 text-right font-semibold dark:bg-gray-950">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -594,76 +597,56 @@ export default function Colaboradores() {
                 <label htmlFor="rol" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Rol
                 </label>
-                <select
+                <Select
                   id="rol"
                   value={form.rol}
-                  onChange={(e) => setForm({ ...form, rol: e.target.value as Rol })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option value="">Seleccionar...</option>
-                  {roles.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setForm({ ...form, rol: v as Rol })}
+                  placeholder="Seleccionar..."
+                  className="mt-1"
+                  options={roles}
+                />
               </div>
 
               <div>
                 <label htmlFor="equipo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Equipo
                 </label>
-                <select
+                <Select
                   id="equipo"
                   value={form.equipo}
-                  onChange={(e) => setForm({ ...form, equipo: e.target.value as Equipo })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option value="">Seleccionar...</option>
-                  {equipos.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setForm({ ...form, equipo: v as Equipo })}
+                  placeholder="Seleccionar..."
+                  className="mt-1"
+                  options={equipos}
+                />
               </div>
 
               <div>
                 <label htmlFor="tipoCurso" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Tipo de curso
                 </label>
-                <select
+                <Select
                   id="tipoCurso"
                   value={form.tipoCurso}
-                  onChange={(e) => setForm({ ...form, tipoCurso: e.target.value as TipoCurso })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option value="">Seleccionar...</option>
-                  {tiposCurso.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setForm({ ...form, tipoCurso: v as TipoCurso })}
+                  placeholder="Seleccionar..."
+                  className="mt-1"
+                  options={tiposCurso}
+                />
               </div>
 
               <div>
                 <label htmlFor="estado" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Estado
                 </label>
-                <select
+                <Select
                   id="estado"
                   value={form.estado}
-                  onChange={(e) => setForm({ ...form, estado: e.target.value as Estado })}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option value="">Seleccionar...</option>
-                  {estados.map((e) => (
-                    <option key={e} value={e}>
-                      {e}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setForm({ ...form, estado: v as Estado })}
+                  placeholder="Seleccionar..."
+                  className="mt-1"
+                  options={estados}
+                />
               </div>
 
               {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}

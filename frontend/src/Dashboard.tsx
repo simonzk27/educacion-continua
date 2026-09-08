@@ -10,9 +10,13 @@ import {
   Gauge,
   Inbox,
   TrendingUp,
+  Search,
+  X,
 } from 'lucide-react'
 import { collection, collectionGroup, onSnapshot, type Timestamp } from 'firebase/firestore'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import DatePicker from './DatePicker'
+import Select from './Select'
 import { db } from './firebase'
 import { type Dia, type Modo, addDays, dateToIso, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
 import Tablero from './Tablero'
@@ -105,6 +109,13 @@ function iniciales(nombre: string): string {
   return letras || '?'
 }
 
+function normalizar(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+}
+
 function formatFechaCorta(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
@@ -147,6 +158,8 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
   const [equipo, setEquipo] = useState('Todas')
   const [tipoCurso, setTipoCurso] = useState('Todos')
   const [estado, setEstado] = useState('Todos')
+  const [usuarioFiltro, setUsuarioFiltro] = useState('Todos')
+  const [busquedaGeneral, setBusquedaGeneral] = useState('')
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [cursosPorId, setCursosPorId] = useState<Record<string, Curso>>({})
@@ -307,12 +320,26 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
     return filasEnRango(desde, hasta)
   }, [rangoActivo, rangoDesde, rangoHasta, inscripciones, horariosPorKey, usuariosPorId, cursosPorId, avances])
 
+  const terminoGeneral = normalizar(busquedaGeneral.trim())
   const filtradas = filasFecha.filter((f) => {
     const matchEquipo = equipo === 'Todas' || f.equipo === equipo
     const matchTipoCurso = tipoCurso === 'Todos' || f.tipoCurso === tipoCurso
     const matchEstado = estado === 'Todos' || f.estado === estado
-    return matchEquipo && matchTipoCurso && matchEstado
+    const matchUsuario = usuarioFiltro === 'Todos' || f.userId === usuarioFiltro
+    const matchGeneral =
+      !terminoGeneral ||
+      normalizar(f.colaborador).includes(terminoGeneral) ||
+      normalizar(f.curso).includes(terminoGeneral)
+    return matchEquipo && matchTipoCurso && matchEstado && matchUsuario && matchGeneral
   })
+
+  const usuariosOpciones = useMemo(
+    () =>
+      [...usuarios]
+        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+        .map((u) => ({ value: u.id, label: u.nombre })),
+    [usuarios],
+  )
 
   const programadas = filtradas.length
   const reportaron = filtradas.filter((f) => f.estado === 'Reportó').length
@@ -546,71 +573,87 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <div className="flex flex-wrap items-end gap-4">
-              <div>
+              <div className="w-44">
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Desde
                 </label>
-                <input
-                  type="date"
-                  value={rangoDesde}
-                  onChange={(e) => setRangoDesde(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:[color-scheme:dark]"
-                />
+                <DatePicker value={rangoDesde} onChange={setRangoDesde} maxDate={rangoHasta || undefined} />
               </div>
-              <div>
+              <div className="w-44">
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Hasta
                 </label>
-                <input
-                  type="date"
-                  value={rangoHasta}
-                  onChange={(e) => setRangoHasta(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 dark:[color-scheme:dark]"
-                />
+                <DatePicker value={rangoHasta} onChange={setRangoHasta} minDate={rangoDesde || undefined} />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Equipo
                 </label>
-                <select
+                <Select
                   value={equipo}
-                  onChange={(e) => setEquipo(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option>Todas</option>
-                  <option>Colombia</option>
-                  <option>USA</option>
-                </select>
+                  onChange={setEquipo}
+                  className="w-36"
+                  options={['Todas', 'Colombia', 'USA']}
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Tipo de curso
                 </label>
-                <select
+                <Select
                   value={tipoCurso}
-                  onChange={(e) => setTipoCurso(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option>Todos</option>
-                  <option>Educación Continua</option>
-                  <option>Unimetab</option>
-                  <option>Academia</option>
-                </select>
+                  onChange={setTipoCurso}
+                  className="w-44"
+                  options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Estado
                 </label>
-                <select
+                <Select
                   value={estado}
-                  onChange={(e) => setEstado(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                >
-                  <option>Todos</option>
-                  <option>Reportó</option>
-                  <option>Pendiente</option>
-                  <option>No reportó</option>
-                </select>
+                  onChange={setEstado}
+                  className="w-36"
+                  options={['Todos', 'Reportó', 'Pendiente', 'No reportó']}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Usuario
+                </label>
+                <Select
+                  value={usuarioFiltro}
+                  onChange={setUsuarioFiltro}
+                  className="w-48"
+                  options={[{ value: 'Todos', label: 'Todos' }, ...usuariosOpciones]}
+                  searchable
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  Buscar
+                </label>
+                <div className="relative w-56">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={busquedaGeneral}
+                    onChange={(e) => setBusquedaGeneral(e.target.value)}
+                    placeholder="Colaborador o curso..."
+                    className="w-full rounded-lg border border-gray-300 py-2 pr-9 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  />
+                  {busquedaGeneral && (
+                    <button
+                      type="button"
+                      onClick={() => setBusquedaGeneral('')}
+                      title="Limpiar búsqueda"
+                      className="absolute top-1/2 right-2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
               <button
                 type="button"
@@ -619,7 +662,9 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   setRangoHasta('')
                   setEquipo('Todas')
                   setTipoCurso('Todos')
+                  setUsuarioFiltro('Todos')
                   setEstado('Todos')
+                  setBusquedaGeneral('')
                 }}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >

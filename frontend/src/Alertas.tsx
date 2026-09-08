@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { BellRing, CheckCircle2, Info } from 'lucide-react'
 import { doc, onSnapshot, serverTimestamp, setDoc, type Timestamp } from 'firebase/firestore'
 import { db } from './firebase'
+import Select from './Select'
 
 const opcionesMinutos = [
   { valor: 15, etiqueta: '15 minutos antes' },
@@ -116,19 +117,13 @@ export default function Alertas({ userId }: AlertasProps) {
             >
               Enviar recordatorio
             </label>
-            <select
+            <Select
               id="minutosAntes"
               disabled={!config.activo}
-              value={config.minutosAntes}
-              onChange={(e) => setConfig({ ...config, minutosAntes: Number(e.target.value) })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-            >
-              {opcionesMinutos.map((o) => (
-                <option key={o.valor} value={o.valor}>
-                  {o.etiqueta}
-                </option>
-              ))}
-            </select>
+              value={String(config.minutosAntes)}
+              onChange={(v) => setConfig({ ...config, minutosAntes: Number(v) })}
+              options={opcionesMinutos.map((o) => ({ value: String(o.valor), label: o.etiqueta }))}
+            />
             <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
               Se aplica a las sesiones programadas de todos los cursos. Solo reciben el correo
               los colaboradores marcados como Activo en Colaboradores.
