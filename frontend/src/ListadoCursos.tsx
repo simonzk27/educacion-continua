@@ -36,6 +36,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import Select from './Select'
+import { estiloTipoCurso } from './tipoCursoColors'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 
 type Estado = 'Activo' | 'Inactivo' | 'Próximo'
@@ -408,20 +409,25 @@ export default function ListadoCursos() {
       </div>
 
       <div className="flex gap-1 border-b border-gray-200 dark:border-gray-800">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t
-                ? 'border-blue-600 text-blue-600 dark:border-indigo-400 dark:text-indigo-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        {tabs.map((t) => {
+          const estilo = estiloTipoCurso(t)
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                tab === t
+                  ? estilo
+                    ? `${estilo.borde} ${estilo.texto}`
+                    : 'border-blue-600 text-blue-600 dark:border-indigo-400 dark:text-indigo-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              {t}
+            </button>
+          )
+        })}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
@@ -520,7 +526,14 @@ export default function ListadoCursos() {
                         )}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipo}</td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${estiloTipoCurso(c.tipo)?.badge}`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${estiloTipoCurso(c.tipo)?.dot}`} />
+                        {c.tipo}
+                      </span>
+                    </td>
                     <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
                       {c.duracionValor} {c.duracionUnidad.toLowerCase()}
                     </td>
@@ -630,7 +643,7 @@ export default function ListadoCursos() {
                       onClick={() => setForm({ ...form, tipo: valor })}
                       className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition-all ${
                         form.tipo === valor
-                          ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-950 dark:text-indigo-400'
+                          ? `bg-white shadow-sm dark:bg-gray-950 ${estiloTipoCurso(valor)?.texto ?? 'text-blue-700 dark:text-indigo-400'}`
                           : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                       }`}
                     >

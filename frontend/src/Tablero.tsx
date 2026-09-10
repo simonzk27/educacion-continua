@@ -1,10 +1,11 @@
-import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { Search, Check, X, TriangleAlert, Inbox } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Search, Check, X, TriangleAlert, Inbox, ChevronRight } from 'lucide-react'
 import { collection, collectionGroup, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, type Timestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import Select from './Select'
 import ButtonGroup from './ButtonGroup'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
+import { colorActivoTipoCurso, estiloTipoCurso } from './tipoCursoColors'
 
 type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
 
@@ -56,27 +57,16 @@ export default function Tablero({ isAdmin }: TableroProps) {
   const [cursoFiltro, setCursoFiltro] = useState('Todos')
   const [buscar, setBuscar] = useState('')
   const [orden, setOrden] = useState<OrdenOpcion>('az')
+  const [ocultarSinCursos, setOcultarSinCursos] = useState(false)
+  const [colapsadas, setColapsadas] = useState<Set<string>>(new Set())
 
-  const [colWidths, setColWidths] = useState<Record<string, number>>({
-    colaborador: 180,
-    equipo: 150,
-  })
-
-  function startColumnResize(e: ReactMouseEvent, columnKey: string, defaultWidth: number) {
-    e.preventDefault()
-    const startX = e.clientX
-    const startWidth = colWidths[columnKey] ?? defaultWidth
-
-    function onMouseMove(ev: MouseEvent) {
-      const next = Math.max(60, startWidth + (ev.clientX - startX))
-      setColWidths((prev) => ({ ...prev, [columnKey]: next }))
-    }
-    function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
+  function toggleColapsada(id: string) {
+    setColapsadas((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   useEffect(() => {
@@ -216,6 +206,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
             onChange={setTipoCursoFiltro}
             className="w-96"
             options={['Todos', ...tiposCursoOpciones]}
+            colorFor={colorActivoTipoCurso}
           />
         </div>
         <div>
@@ -237,6 +228,29 @@ export default function Tablero({ isAdmin }: TableroProps) {
             options={ordenOpciones.map((o) => ({ value: o.value, label: o.label }))}
           />
         </div>
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={ocultarSinCursos}
+            onChange={(e) => setOcultarSinCursos(e.target.checked)}
+            className="h-4 w-4 accent-blue-600 dark:accent-indigo-500"
+          />
+          Ocultar sin cursos
+        </label>
+        <button
+          type="button"
+          onClick={() => setColapsadas(new Set(personasFiltradas.map((p) => p.id)))}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+        >
+          Colapsar todo
+        </button>
+        <button
+          type="button"
+          onClick={() => setColapsadas(new Set())}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+        >
+          Expandir todo
+        </button>
         <button
           type="button"
           onClick={() => {
@@ -244,6 +258,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
             setEquipoFiltro('Todos')
             setTipoCursoFiltro('Todos')
             setCursoFiltro('Todos')
+            setOcultarSinCursos(false)
           }}
           className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
@@ -251,199 +266,198 @@ export default function Tablero({ isAdmin }: TableroProps) {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="max-h-[70vh] overflow-auto">
-          <table className="w-full min-w-[800px] table-fixed text-left text-sm">
-            <colgroup>
-              <col style={{ width: colWidths.colaborador ?? 180 }} />
-              <col style={{ width: colWidths.equipo ?? 150 }} />
-              {cursosVisibles.map((c) => (
-                <col key={c.id} style={{ width: colWidths[c.id] ?? 130 }} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:bg-gray-950 dark:text-gray-500">
-                <th className="sticky top-0 left-0 z-30 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
-                  <span className="block truncate">Colaborador</span>
-                  <span
-                    onMouseDown={(e) => startColumnResize(e, 'colaborador', 180)}
-                    role="separator"
-                    aria-orientation="vertical"
-                    aria-label="Ajustar ancho de columna"
-                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-400/50 active:bg-blue-500/60 dark:hover:bg-indigo-400/50"
-                  />
-                </th>
-                <th className="sticky top-0 z-20 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
-                  <span className="block truncate">Equipo</span>
-                  <span
-                    onMouseDown={(e) => startColumnResize(e, 'equipo', 150)}
-                    role="separator"
-                    aria-orientation="vertical"
-                    aria-label="Ajustar ancho de columna"
-                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-400/50 active:bg-blue-500/60 dark:hover:bg-indigo-400/50"
-                  />
-                </th>
-                {cursosVisibles.map((c) => (
-                  <th
-                    key={c.id}
-                    className="sticky top-0 z-20 bg-gray-50 px-3 py-3 text-center font-semibold dark:bg-gray-950"
-                  >
-                    <span className="block truncate">{c.nombre}</span>
-                    <span
-                      onMouseDown={(e) => startColumnResize(e, c.id, 130)}
-                      className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-400/50 active:bg-blue-500/60 dark:hover:bg-indigo-400/50"
+      {loading ? (
+        <div className="flex flex-col gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={`tablero-skeleton-${i}`}
+              className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800" />
+                <div className="h-4 w-40 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
+              </div>
+              <div className="mt-4 flex flex-col gap-2">
+                <div className="h-10 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+                <div className="h-10 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : personasFiltradas.length === 0 || cursosVisibles.length === 0 ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-10 dark:border-gray-800 dark:bg-gray-900">
+          <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
+            <Inbox className="h-8 w-8" />
+            <p className="text-sm">No hay datos suficientes todavía.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {personasFiltradas.map((p) => {
+            const cursosPersona = cursosVisibles
+              .map((c) => ({ curso: c, insc: inscripcionesPorClave.get(`${c.id}_${p.id}`) }))
+              .filter(
+                (x): x is { curso: Curso; insc: InscripcionTablero } => x.insc !== undefined,
+              )
+
+            const filas = cursosPersona.map(({ curso: c, insc }) => {
+              const clave = `${c.id}_${p.id}`
+              const tieneAvance = avanceExisteSet.has(clave)
+              const esEC = c.tipo === 'Educación Continua'
+              const totalCurso = c.duracionValor > 0 ? c.duracionValor : 1
+              const leccionesHechas = progresoPorClave.get(clave) ?? 0
+              const ajustadoPorAdmin = insc.completado === true && insc.confirmado === true
+              const completadoReal = ajustadoPorAdmin || (esEC ? tieneAvance : leccionesHechas >= totalCurso)
+              const confirmado = ajustadoPorAdmin || (esEC ? tieneAvance && insc.confirmado : completadoReal)
+              const pendienteConfirmar = esEC && tieneAvance && !insc.confirmado
+              const puedeConfirmar = isAdmin && pendienteConfirmar
+              const pct = ajustadoPorAdmin
+                ? 100
+                : esEC
+                  ? tieneAvance
+                    ? 100
+                    : 0
+                  : Math.min(100, Math.round((leccionesHechas / totalCurso) * 100))
+              const fecha = insc.fechaCompletado
+                ? insc.fechaCompletado.toDate().toLocaleDateString('es-CO', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })
+                : null
+              return { curso: c, confirmado, pendienteConfirmar, puedeConfirmar, pct, fecha }
+            })
+
+            if (ocultarSinCursos && filas.length === 0) return null
+
+            const completados = filas.filter((f) => f.confirmado).length
+            const colapsada = colapsadas.has(p.id)
+
+            return (
+              <div
+                key={p.id}
+                className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleColapsada(p.id)}
+                  aria-expanded={!colapsada}
+                  className="flex w-full flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50/60 px-5 py-4 text-left transition-colors hover:bg-gray-100/60 dark:border-gray-800 dark:bg-gray-950/40 dark:hover:bg-gray-900/60"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ChevronRight
+                      className={`h-4 w-4 shrink-0 text-gray-400 transition-transform dark:text-gray-500 ${colapsada ? '' : 'rotate-90'}`}
                     />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={`tablero-skeleton-${i}`}>
-                    <td className="sticky left-0 z-10 bg-white px-5 py-3 dark:bg-gray-900">
-                      <div className="h-4 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="h-4 w-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-                    </td>
-                    {cursosVisibles.map((c) => (
-                      <td key={c.id} className="px-3 py-3 text-center">
-                        <div className="mx-auto h-6 w-6 animate-pulse rounded-md bg-gray-100 dark:bg-gray-800" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : personasFiltradas.length === 0 || cursosVisibles.length === 0 ? (
-                <tr>
-                  <td colSpan={2 + cursosVisibles.length} className="px-5 py-10">
-                    <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
-                      <Inbox className="h-8 w-8" />
-                      <p className="text-sm">No hay datos suficientes todavía.</p>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                      {iniciales(p.nombre)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900 dark:text-gray-100">{p.nombre}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{p.equipo ?? 'Sin equipo'}</p>
                     </div>
-                  </td>
-                </tr>
-              ) : (
-                personasFiltradas.map((p) => (
-                  <tr key={p.id} className="group transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
-                    <td className="sticky left-0 z-10 bg-white px-5 py-3 font-semibold text-gray-900 group-hover:bg-gray-50/80 dark:bg-gray-900 dark:text-gray-100 dark:group-hover:bg-gray-800/40">
-                      <span className="flex items-center gap-2.5">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-                          {iniciales(p.nombre)}
-                        </span>
-                        <span className="truncate">{p.nombre}</span>
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{p.equipo ?? '–'}</td>
-                    {cursosVisibles.map((c) => {
-                      const insc = inscripcionesPorClave.get(`${c.id}_${p.id}`)
+                  </div>
+                  {filas.length > 0 && (
+                    <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 shadow-sm dark:bg-gray-900 dark:text-gray-300">
+                      {completados}/{filas.length} completados
+                    </span>
+                  )}
+                </button>
+
+                {!colapsada && (
+                <>
+
+                {filas.length === 0 ? (
+                  <p className="px-5 py-5 text-sm text-gray-400 dark:text-gray-500">
+                    Sin cursos que coincidan con el filtro.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {filas.map(({ curso: c, confirmado, pendienteConfirmar, puedeConfirmar, pct, fecha }) => {
+                      const estilo = estiloTipoCurso(c.tipo)
                       const key = `${c.id}_${p.id}`
-                      const fecha = insc?.fechaCompletado
-                        ? insc.fechaCompletado.toDate().toLocaleDateString('es-CO', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })
-                        : null
-
-                      if (!insc) {
-                        return (
-                          <td key={c.id} className="px-3 py-3 text-center">
-                            <span
-                              className="inline-block h-6 w-6 rounded-md bg-gray-100 dark:bg-gray-800"
-                              title="No inscrito"
-                            />
-                          </td>
-                        )
-                      }
-
-                      const clave = `${c.id}_${p.id}`
-                      const tieneAvance = avanceExisteSet.has(clave)
-                      const esEC = c.tipo === 'Educación Continua'
-                      const totalCurso = c.duracionValor > 0 ? c.duracionValor : 1
-                      const leccionesHechas = progresoPorClave.get(clave) ?? 0
-                      const ajustadoPorAdmin = insc.completado === true && insc.confirmado === true
-                      const completadoReal =
-                        ajustadoPorAdmin || (esEC ? tieneAvance : leccionesHechas >= totalCurso)
-
-                      const confirmado =
-                        ajustadoPorAdmin || (esEC ? tieneAvance && insc.confirmado : completadoReal)
-                      const pendienteConfirmar = esEC && tieneAvance && !insc.confirmado
-                      const puedeConfirmar = isAdmin && pendienteConfirmar && esEC
-
-                      const celda = (
-                        <span
-                          className={`inline-flex h-6 w-6 items-center justify-center rounded-md ${
-                            confirmado
-                              ? 'bg-emerald-500 text-white'
-                              : pendienteConfirmar
-                                ? 'bg-amber-500 text-white'
-                                : 'bg-red-500 text-white'
-                          }`}
-                        >
-                          {confirmado ? (
-                            <Check className="h-3.5 w-3.5" />
-                          ) : pendienteConfirmar ? (
-                            <TriangleAlert className="h-3.5 w-3.5" />
-                          ) : (
-                            <X className="h-3.5 w-3.5" />
-                          )}
-                        </span>
-                      )
-
-                      const pct = ajustadoPorAdmin
-                        ? 100
-                        : esEC
-                          ? (tieneAvance ? 100 : 0)
-                          : Math.min(100, Math.round((leccionesHechas / totalCurso) * 100))
                       const barColor =
                         pct >= 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-700'
-
-                      const tituloCelda = confirmado
+                      const estadoIcono = confirmado ? (
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                          <Check className="h-4 w-4" />
+                        </span>
+                      ) : pendienteConfirmar ? (
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+                          <TriangleAlert className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
+                          <X className="h-4 w-4" />
+                        </span>
+                      )
+                      const titulo = confirmado
                         ? `Completado${fecha ? ` el ${fecha}` : ''}`
                         : pendienteConfirmar
                           ? `100% · pendiente de confirmación${puedeConfirmar ? ' · clic para confirmar' : ''}`
                           : 'Pendiente'
 
                       return (
-                        <td key={c.id} className="px-3 py-3 text-center">
-                          <div className="flex flex-col items-center gap-1">
+                        <div
+                          key={c.id}
+                          className="flex flex-wrap items-center gap-4 px-5 py-3.5 transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40"
+                        >
+                          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${estilo?.dot ?? 'bg-gray-300 dark:bg-gray-700'}`} />
+
+                          <div className="min-w-[180px] flex-1">
+                            <p className="text-sm font-medium break-words text-gray-900 dark:text-gray-100">
+                              {c.nombre}
+                            </p>
+                            <span
+                              className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${estilo?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
+                            >
+                              {c.tipo}
+                            </span>
+                          </div>
+
+                          <div className="flex w-36 shrink-0 items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                              <div
+                                className={`h-full rounded-full transition-[width] ${barColor}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-9 shrink-0 text-right text-xs text-gray-400 dark:text-gray-500">
+                              {pct}%
+                            </span>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-2">
+                            {fecha && confirmado && (
+                              <span className="text-xs whitespace-nowrap text-gray-400 dark:text-gray-500">
+                                {fecha}
+                              </span>
+                            )}
                             {puedeConfirmar ? (
                               <button
                                 type="button"
                                 disabled={togglingKey === key}
                                 onClick={() => handleConfirmarCompletado(p.id, c.id)}
-                                title={tituloCelda}
+                                title={titulo}
                                 className="transition-transform hover:scale-110 disabled:opacity-50 disabled:hover:scale-100"
                               >
-                                {celda}
+                                {estadoIcono}
                               </button>
                             ) : (
-                              <span title={tituloCelda}>{celda}</span>
+                              <span title={titulo}>{estadoIcono}</span>
                             )}
-                            {confirmado && fecha && (
-                              <span className="text-[10px] whitespace-nowrap text-gray-400 dark:text-gray-500">
-                                {fecha}
-                              </span>
-                            )}
-                            <div
-                              className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
-                              title={`${pct}% completado`}
-                            >
-                              <div className={`h-full rounded-full transition-[width] ${barColor}`} style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500">{pct}%</span>
                           </div>
-                        </td>
+                        </div>
                       )
                     })}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                  </div>
+                )}
+                </>
+                )}
+              </div>
+            )
+          })}
         </div>
-      </div>
+      )}
     </div>
   )
 }

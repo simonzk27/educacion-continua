@@ -18,6 +18,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import DatePicker from './DatePicker'
 import Select from './Select'
 import ButtonGroup from './ButtonGroup'
+import { colorActivoTipoCurso, estiloTipoCurso } from './tipoCursoColors'
 import { db } from './firebase'
 import { type Dia, type Modo, addDays, dateToIso, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
 import Tablero from './Tablero'
@@ -641,6 +642,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   className="w-96"
                   options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
                   ariaLabel="Tipo de curso"
+                  colorFor={colorActivoTipoCurso}
                 />
               </div>
               <div>
@@ -796,7 +798,18 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                           </span>
                         </td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.equipo ?? '–'}</td>
-                        <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.tipoCurso ?? '–'}</td>
+                        <td className="px-5 py-3">
+                          {f.tipoCurso ? (
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${estiloTipoCurso(f.tipoCurso)?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${estiloTipoCurso(f.tipoCurso)?.dot ?? 'bg-gray-400'}`} />
+                              {f.tipoCurso}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500">–</span>
+                          )}
+                        </td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{f.curso}</td>
                         <td className="px-5 py-3 whitespace-nowrap text-gray-600 dark:text-gray-400">
                           {formatFechaCorta(f.fecha)}
