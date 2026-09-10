@@ -3,6 +3,8 @@ import { Search, Check, X, TriangleAlert, Inbox } from 'lucide-react'
 import { collection, collectionGroup, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, type Timestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import Select from './Select'
+import ButtonGroup from './ButtonGroup'
+import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 
 type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
 
@@ -18,6 +20,7 @@ type PersonaTablero = {
   nombre: string
   equipo: string | null
   tipoCurso: string | null
+  creadoEn: { toMillis: () => number } | null
 }
 
 type InscripcionTablero = {
@@ -52,6 +55,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
   const [tipoCursoFiltro, setTipoCursoFiltro] = useState('Todos')
   const [cursoFiltro, setCursoFiltro] = useState('Todos')
   const [buscar, setBuscar] = useState('')
+  const [orden, setOrden] = useState<OrdenOpcion>('az')
 
   const [colWidths, setColWidths] = useState<Record<string, number>>({
     colaborador: 180,
@@ -94,6 +98,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
             nombre: (data.nombre as string) ?? '',
             equipo: (data.equipo as string) ?? null,
             tipoCurso: (data.tipoCurso as string) ?? null,
+            creadoEn: (data.creadoEn as { toMillis: () => number } | undefined) ?? null,
           }
         }),
       )
@@ -165,13 +170,19 @@ export default function Tablero({ isAdmin }: TableroProps) {
 
   const cursosVisibles = cursoFiltro === 'Todos' ? cursos : cursos.filter((c) => c.id === cursoFiltro)
 
-  const personasFiltradas = personasTablero.filter((p) => {
+  const personasFiltradasSinOrden = personasTablero.filter((p) => {
     const matchEquipo = equipoFiltro === 'Todos' || (p.equipo ?? '') === equipoFiltro
     const matchTipoCurso = tipoCursoFiltro === 'Todos' || (p.tipoCurso ?? '') === tipoCursoFiltro
     const term = buscar.trim().toLowerCase()
     const matchBusqueda = !term || p.nombre.toLowerCase().includes(term)
     return matchEquipo && matchTipoCurso && matchBusqueda
   })
+  const personasFiltradas = ordenarPorNombreYFecha(
+    personasFiltradasSinOrden,
+    orden,
+    (p) => p.nombre,
+    (p) => p.creadoEn,
+  )
 
   return (
     <div className="flex flex-col gap-6">
@@ -191,19 +202,19 @@ export default function Tablero({ isAdmin }: TableroProps) {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Equipo</label>
-          <Select
+          <ButtonGroup
             value={equipoFiltro}
             onChange={setEquipoFiltro}
-            className="w-36"
+            className="w-40"
             options={['Todos', ...equiposOpciones]}
           />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Tipo de curso</label>
-          <Select
+          <ButtonGroup
             value={tipoCursoFiltro}
             onChange={setTipoCursoFiltro}
-            className="w-44"
+            className="w-96"
             options={['Todos', ...tiposCursoOpciones]}
           />
         </div>
@@ -214,6 +225,16 @@ export default function Tablero({ isAdmin }: TableroProps) {
             onChange={setCursoFiltro}
             className="w-44"
             options={[{ value: 'Todos', label: 'Todos' }, ...cursos.map((c) => ({ value: c.id, label: c.nombre }))]}
+            searchable
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Ordenar</label>
+          <Select
+            value={orden}
+            onChange={(v) => setOrden(v as OrdenOpcion)}
+            className="w-44"
+            options={ordenOpciones.map((o) => ({ value: o.value, label: o.label }))}
           />
         </div>
         <button

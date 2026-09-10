@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  ExternalLink,
   Inbox,
   KeyRound,
   X,
@@ -47,6 +48,7 @@ type Curso = {
   tipo: string
   duracionValor: number
   duracionUnidad: string
+  link: string | null
 }
 
 type Horario = {
@@ -71,7 +73,7 @@ type MiPanelProps = {
   readonly nombre: string | null
   readonly userId: string
   readonly puedeCambiarPassword: boolean
-  readonly onRegistrarAvance: () => void
+  readonly onRegistrarAvance: (cursoId?: string) => void
 }
 
 function iniciales(nombre: string): string {
@@ -153,6 +155,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
           tipo: (data.tipo as string) ?? '',
           duracionValor: (data.duracionValor as number) ?? 0,
           duracionUnidad: (data.duracionUnidad as string) ?? '',
+          link: (data.link as string | null) ?? null,
         }
       })
       setCursosPorId(map)
@@ -256,13 +259,20 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
         if (!curso) return null
         const horario = horariosPorCurso[cursoId]
         if (!horario || !horario.hora) {
-          return { id: cursoId, nombre: curso.nombre, progreso: null as number | null, estado: 'Sin horario asignado' }
+          return {
+            id: cursoId,
+            nombre: curso.nombre,
+            link: curso.link,
+            progreso: null as number | null,
+            estado: 'Sin horario asignado',
+          }
         }
         if (curso.tipo === 'Educación Continua') {
           const registrado = leccionesPorCursoActuales.has(cursoId)
           return {
             id: cursoId,
             nombre: curso.nombre,
+            link: curso.link,
             progreso: registrado ? 100 : 0,
             estado: registrado ? 'Completado' : 'En progreso',
           }
@@ -271,7 +281,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
         const hechas = leccionesPorCursoActuales.get(cursoId) ?? 0
         const progreso = Math.min(100, Math.round((hechas / total) * 100))
         const estado = hechas === 0 ? 'Asignado · Aún sin avances' : progreso >= 100 ? 'Completado' : 'En progreso'
-        return { id: cursoId, nombre: curso.nombre, progreso, estado }
+        return { id: cursoId, nombre: curso.nombre, link: curso.link, progreso, estado }
       })
       .filter((c): c is NonNullable<typeof c> => c !== null)
   }, [cursoIds, cursosPorId, horariosPorCurso, leccionesPorCursoActuales])
@@ -387,7 +397,22 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                     const finalizado = estaFinalizado(c)
                     return (
                       <tr key={c.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
-                        <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">{c.nombre}</td>
+                        <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
+                          <span className="inline-flex items-center gap-1.5">
+                            {c.nombre}
+                            {c.link && (
+                              <a
+                                href={c.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Abrir enlace externo"
+                                className="shrink-0 text-gray-400 transition-colors hover:text-blue-600 dark:hover:text-indigo-400"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </span>
+                        </td>
                         <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipo || '–'}</td>
                         <td className="px-5 py-3">
                           <span
@@ -428,7 +453,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
           </div>
           <button
             type="button"
-            onClick={onRegistrarAvance}
+            onClick={() => onRegistrarAvance(proximaSesion?.cursoId)}
             className="flex w-fit items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-600 shadow-sm transition-colors hover:bg-blue-50 dark:text-indigo-600 dark:hover:bg-indigo-50"
           >
             Registrar avance
@@ -460,7 +485,20 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                 <div key={c.id}>
                   <div className="flex items-center justify-between text-sm">
                     <div>
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">{c.nombre}</p>
+                      <p className="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-gray-100">
+                        {c.nombre}
+                        {c.link && (
+                          <a
+                            href={c.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Abrir enlace externo"
+                            className="shrink-0 text-gray-400 transition-colors hover:text-blue-600 dark:hover:text-indigo-400"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </p>
                       <p
                         className={`text-xs font-medium ${
                           c.estado === 'Completado'

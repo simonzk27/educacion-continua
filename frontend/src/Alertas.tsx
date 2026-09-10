@@ -5,6 +5,7 @@ import { db } from './firebase'
 import Select from './Select'
 
 const opcionesMinutos = [
+  { valor: 10, etiqueta: '10 minutos antes' },
   { valor: 15, etiqueta: '15 minutos antes' },
   { valor: 30, etiqueta: '30 minutos antes' },
   { valor: 60, etiqueta: '1 hora antes' },

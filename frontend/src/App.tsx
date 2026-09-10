@@ -30,6 +30,7 @@ function ViewFallback() {
 function App() {
   const { firebaseUser, role, nombre, puedeCambiarPassword, loading, blockedMessage } = useAuth()
   const [activeView, setActiveView] = useState<ViewId>('mi-panel')
+  const [preselectCursoId, setPreselectCursoId] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
   const { theme, toggleTheme } = useTheme()
 
@@ -64,11 +65,14 @@ function App() {
         nombre={nombre}
         userId={firebaseUser.uid}
         puedeCambiarPassword={puedeCambiarPassword}
-        onRegistrarAvance={() => setActiveView('registrar-avance')}
+        onRegistrarAvance={(cursoId) => {
+          setPreselectCursoId(cursoId ?? null)
+          setActiveView('registrar-avance')
+        }}
       />
     )
   } else if (vista === 'registrar-avance') {
-    content = <RegistrarAvance userId={firebaseUser.uid} />
+    content = <RegistrarAvance userId={firebaseUser.uid} preselectCursoId={preselectCursoId} />
   } else if (vista === 'dashboard-hoy') {
     content = <Dashboard isAdmin={role === 'Admin'} />
   } else if (vista === 'horarios') {

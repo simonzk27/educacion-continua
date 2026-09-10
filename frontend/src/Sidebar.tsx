@@ -72,13 +72,15 @@ export default function Sidebar({
         }`}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white dark:bg-indigo-500">
-            EC
-          </div>
+          <img
+            src="/naturalslim-logo.jpg"
+            alt="Entrenamiento"
+            className="h-9 w-9 shrink-0 rounded-xl object-contain"
+          />
           {!collapsed && (
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                Educación Continua
+                Entrenamiento
               </p>
               <p className="truncate text-xs text-gray-500 dark:text-gray-400">
                 Gestión y seguimiento

@@ -16,7 +16,9 @@ import { collection, collectionGroup, doc, onSnapshot, orderBy, query, setDoc } 
 import { db } from './firebase'
 import { addDays, ocurrenciasEntre, formatFechaSesion } from './scheduleUtils'
 import Select from './Select'
+import ButtonGroup from './ButtonGroup'
 import TimePicker from './TimePicker'
+import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 
 type Equipo = 'Colombia' | 'USA'
 type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia'
@@ -46,6 +48,7 @@ type Usuario = {
 type Inscripcion = {
   userId: string
   cursoId: string
+  asignadoEn: { toMillis: () => number } | null
 }
 
 type Modo = 'semanal' | 'mensual'
@@ -82,6 +85,7 @@ type Fila = {
   duracionMin: number | null
   vigenciaInicio: string | null
   vigenciaFin: string | null
+  asignadoEn: { toMillis: () => number } | null
 }
 
 const estadoStyles: Record<Estado, string> = {
@@ -182,6 +186,7 @@ export default function Horarios() {
   const [colaborador, setColaborador] = useState('Todos')
   const [curso, setCurso] = useState('Todos')
   const [estado, setEstado] = useState('Todos')
+  const [orden, setOrden] = useState<OrdenOpcion>('az')
 
   const [vista, setVista] = useState<'tabla' | 'colaborador'>('tabla')
   const [colaboradorVistaId, setColaboradorVistaId] = useState<string | null>(null)
@@ -255,7 +260,11 @@ export default function Horarios() {
               const userId = data.userId as string | undefined
               const cursoId = d.ref.parent.parent?.id
               if (!userId || !cursoId) return null
-              return { userId, cursoId }
+              return {
+                userId,
+                cursoId,
+                asignadoEn: (data.asignadoEn as { toMillis: () => number } | undefined) ?? null,
+              }
             })
             .filter((v): v is Inscripcion => v !== null),
         )
@@ -338,10 +347,10 @@ export default function Horarios() {
           duracionMin: h?.duracionMin ?? null,
           vigenciaInicio: h?.vigenciaInicio ?? null,
           vigenciaFin: h?.vigenciaFin ?? null,
+          asignadoEn: insc.asignadoEn,
         }
       })
       .filter((f): f is Fila => f !== null)
-      .sort((a, b) => a.colaborador.localeCompare(b.colaborador))
   }, [inscripciones, usuariosPorId, cursoNombres, horarios])
 
   const colaboradoresOpciones = useMemo(
@@ -361,7 +370,7 @@ export default function Horarios() {
           return palabrasColaboradorLista.every((p) => texto.includes(p))
         })
 
-  const filtradas = filas.filter((f) => {
+  const filtradasSinOrden = filas.filter((f) => {
     const matchEquipo = equipo === 'Todas' || f.equipo === equipo
     const matchTipoCurso = tipoCurso === 'Todos' || f.tipoCurso === tipoCurso
     const matchColaborador = colaborador === 'Todos' || f.colaborador === colaborador
@@ -370,6 +379,12 @@ export default function Horarios() {
     const matchEstado = estado === 'Todos' || estadoFila === estado
     return matchEquipo && matchTipoCurso && matchColaborador && matchCurso && matchEstado
   })
+  const filtradas = ordenarPorNombreYFecha(
+    filtradasSinOrden,
+    orden,
+    (f) => f.colaborador,
+    (f) => f.asignadoEn,
+  )
 
   useEffect(() => {
     if (vista !== 'colaborador') return
@@ -566,49 +581,78 @@ export default function Horarios() {
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex flex-wrap items-end gap-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+            <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Equipo
-            </label>
-            <Select value={equipo} onChange={setEquipo} className="w-36" options={['Todas', 'Colombia', 'USA']} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
-              Tipo de curso
-            </label>
-            <Select
-              value={tipoCurso}
-              onChange={setTipoCurso}
-              className="w-44"
-              options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
+            </span>
+            <ButtonGroup
+              value={equipo}
+              onChange={setEquipo}
+              className="w-40"
+              options={['Todas', 'Colombia', 'USA']}
+              ariaLabel="Equipo"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+            <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+              Tipo de curso
+            </span>
+            <ButtonGroup
+              value={tipoCurso}
+              onChange={setTipoCurso}
+              className="w-96"
+              options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
+              ariaLabel="Tipo de curso"
+            />
+          </div>
+          <div>
+            <label htmlFor="horColaborador" className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Colaborador
             </label>
             <Select
+              id="horColaborador"
               value={colaborador}
               onChange={setColaborador}
               className="w-44"
               options={['Todos', ...colaboradoresOpciones]}
+              searchable
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+            <label htmlFor="horCurso" className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Curso
             </label>
             <Select
+              id="horCurso"
               value={curso}
               onChange={setCurso}
               className="w-44"
               options={['Todos', ...cursosOpciones]}
+              searchable
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+            <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Estado
+            </span>
+            <ButtonGroup
+              value={estado}
+              onChange={setEstado}
+              className="w-52"
+              options={['Todos', 'Activo', 'Inactivo']}
+              ariaLabel="Estado"
+            />
+          </div>
+          <div>
+            <label htmlFor="horOrden" className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+              Ordenar
             </label>
-            <Select value={estado} onChange={setEstado} className="w-36" options={['Todos', 'Activo', 'Inactivo']} />
+            <Select
+              id="horOrden"
+              value={orden}
+              onChange={(v) => setOrden(v as OrdenOpcion)}
+              className="w-44"
+              options={ordenOpciones.map((o) => ({ value: o.value, label: o.label }))}
+            />
           </div>
         </div>
       </div>
@@ -714,6 +758,7 @@ export default function Horarios() {
                 value={colaboradorBusqueda}
                 onChange={(e) => setColaboradorBusqueda(e.target.value)}
                 placeholder="Buscar colaborador..."
+                aria-label="Buscar colaborador"
                 className="w-full rounded-lg border border-gray-300 py-1.5 pr-7 pl-8 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
               />
               {colaboradorBusqueda && (
@@ -791,6 +836,7 @@ export default function Horarios() {
                   value={cursoBusqueda}
                   onChange={(e) => setCursoBusqueda(e.target.value)}
                   placeholder="Buscar curso..."
+                  aria-label="Buscar curso"
                   className="w-full rounded-lg border border-gray-300 py-2 pr-9 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
                 {cursoBusqueda && (
@@ -1023,7 +1069,7 @@ export default function Horarios() {
                     <Clock className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                     Hora
                   </label>
-                  <TimePicker value={form.hora} onChange={(hora) => setForm({ ...form, hora })} />
+                  <TimePicker id="hora" value={form.hora} onChange={(hora) => setForm({ ...form, hora })} />
                 </div>
                 <div>
                   <label

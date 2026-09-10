@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Pencil, Trash2, X, CheckCircle2, TriangleAlert, KeyRound, Lock, LockOpen, Inbox, Search } from 'lucide-react'
+import { Plus, Pencil, X, CheckCircle2, KeyRound, Lock, LockOpen, Inbox, Search, Eye, EyeOff } from 'lucide-react'
 import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -10,23 +10,25 @@ import {
   collection,
   collectionGroup,
   doc,
-  getDocs,
   increment,
   setDoc,
   updateDoc,
   onSnapshot,
   orderBy,
   query,
-  where,
-  writeBatch,
+  serverTimestamp,
 } from 'firebase/firestore'
 import { auth, db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
 import Select from './Select'
+import TimePicker from './TimePicker'
+import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
+import { type Dia, diaCorto, todayIso } from './scheduleUtils'
+
+const dias: Dia[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 type Rol = 'Admin' | 'Usuario'
 type Estado = 'Activo' | 'Inactivo'
 type Equipo = 'Colombia' | 'USA'
-type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia'
 
 type Colaborador = {
   id: string
@@ -34,9 +36,9 @@ type Colaborador = {
   email: string
   rol: Rol
   equipo: Equipo | null
-  tipoCurso: TipoCurso | null
   activo: boolean
   puedeCambiarPassword: boolean
+  creadoEn: { toMillis: () => number } | null
 }
 
 const rolToFirestore: Record<Rol, string> = { Admin: 'admin', Usuario: 'usuario' }
@@ -45,7 +47,6 @@ const firestoreToRol: Record<string, Rol> = { admin: 'Admin', usuario: 'Usuario'
 const roles: Rol[] = ['Admin', 'Usuario']
 const estados: Estado[] = ['Activo', 'Inactivo']
 const equipos: Equipo[] = ['Colombia', 'USA']
-const tiposCurso: TipoCurso[] = ['Educación Continua', 'Unimetab', 'Academia']
 
 const estadoStyles: Record<Estado, string> = {
   Activo: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
@@ -65,6 +66,10 @@ function normalizar(texto: string): string {
     .toLowerCase()
 }
 
+function capitalizarPalabras(texto: string): string {
+  return texto.replace(/(^|\s)(\S)/g, (_, sep, letra) => sep + letra.toUpperCase())
+}
+
 function iniciales(nombre: string): string {
   const partes = nombre.trim().split(/\s+/).slice(0, 2)
   const letras = partes.map((p) => p[0]?.toUpperCase() ?? '').join('')
@@ -77,7 +82,6 @@ const emptyForm = {
   password: '',
   rol: '' as Rol | '',
   equipo: '' as Equipo | '',
-  tipoCurso: '' as TipoCurso | '',
   estado: '' as Estado | '',
 }
 
@@ -92,13 +96,24 @@ export default function Colaboradores() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<Colaborador | null>(null)
-  const [deletingBusy, setDeletingBusy] = useState(false)
   const [resetting, setResetting] = useState<Colaborador | null>(null)
   const [resettingBusy, setResettingBusy] = useState(false)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [cursosExpandidos, setCursosExpandidos] = useState<Set<string>>(new Set())
   const [colabSearch, setColabSearch] = useState('')
+  const [estadoFiltro, setEstadoFiltro] = useState<Estado | 'Todos'>('Todos')
+  const [equipoFiltro, setEquipoFiltro] = useState<Equipo | 'Todos'>('Todos')
+  const [rolFiltro, setRolFiltro] = useState<Rol | 'Todos'>('Todos')
+  const [showPassword, setShowPassword] = useState(false)
+  const [orden, setOrden] = useState<OrdenOpcion>('az')
+
+  const [horarioSetup, setHorarioSetup] = useState<{ userId: string; nombre: string; email: string; rol: Rol } | null>(
+    null,
+  )
+  const emptyHorarioForm = { cursoId: '', dias: [] as Dia[], hora: '', duracionHoras: '', duracionMinutos: '' }
+  const [horarioForm, setHorarioForm] = useState(emptyHorarioForm)
+  const [horarioSubmitting, setHorarioSubmitting] = useState(false)
+  const [horarioError, setHorarioError] = useState<string | null>(null)
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('nombre'))
@@ -112,9 +127,9 @@ export default function Colaboradores() {
             email: data.email ?? '',
             rol: firestoreToRol[data.rol] ?? 'Usuario',
             equipo: (data.equipo as Equipo) ?? null,
-            tipoCurso: (data.tipoCurso as TipoCurso) ?? null,
             activo: data.activo !== false,
             puedeCambiarPassword: data.puedeCambiarPassword === true,
+            creadoEn: (data.creadoEn as { toMillis: () => number } | undefined) ?? null,
           }
         }),
       )
@@ -157,13 +172,21 @@ export default function Colaboradores() {
 
   const terminoColab = normalizar(colabSearch.trim())
   const palabrasColab = terminoColab.split(/\s+/).filter(Boolean)
-  const colaboradoresFiltrados =
-    palabrasColab.length === 0
-      ? colaboradores
-      : colaboradores.filter((c) => {
-          const texto = normalizar(`${c.nombre} ${c.email}`)
-          return palabrasColab.every((p) => texto.includes(p))
-        })
+  const colaboradoresFiltradosSinOrden = colaboradores.filter((c) => {
+    const estado: Estado = c.activo ? 'Activo' : 'Inactivo'
+    const matchEstado = estadoFiltro === 'Todos' || estado === estadoFiltro
+    const matchEquipo = equipoFiltro === 'Todos' || c.equipo === equipoFiltro
+    const matchRol = rolFiltro === 'Todos' || c.rol === rolFiltro
+    const texto = normalizar(`${c.nombre} ${c.email}`)
+    const matchSearch = palabrasColab.every((p) => texto.includes(p))
+    return matchEstado && matchEquipo && matchRol && matchSearch
+  })
+  const colaboradoresFiltrados = ordenarPorNombreYFecha(
+    colaboradoresFiltradosSinOrden,
+    orden,
+    (c) => c.nombre,
+    (c) => c.creadoEn,
+  )
 
   function toggleCursosExpandido(colaboradorId: string) {
     setCursosExpandidos((prev) => {
@@ -195,7 +218,6 @@ export default function Colaboradores() {
       password: '',
       rol: colaborador.rol,
       equipo: colaborador.equipo ?? '',
-      tipoCurso: colaborador.tipoCurso ?? '',
       estado: colaborador.activo ? 'Activo' : 'Inactivo',
     })
     setFormError(null)
@@ -221,7 +243,6 @@ export default function Colaboradores() {
       (!editingId && !passwordValida) ||
       !form.rol ||
       !form.equipo ||
-      !form.tipoCurso ||
       !form.estado
     ) {
       setFormError(
@@ -239,27 +260,33 @@ export default function Colaboradores() {
           nombre: form.nombre.trim(),
           rol: rolToFirestore[form.rol],
           equipo: form.equipo,
-          tipoCurso: form.tipoCurso,
           activo: form.estado === 'Activo',
         })
         setToast('Colaborador actualizado correctamente.')
       } else {
         const secondaryAuth = getSecondaryAuth()
+        let uid: string
         try {
           const cred = await createUserWithEmailAndPassword(secondaryAuth, form.email.trim(), form.password)
-          await setDoc(doc(db, 'users', cred.user.uid), {
+          uid = cred.user.uid
+          await setDoc(doc(db, 'users', uid), {
             nombre: form.nombre.trim(),
             email: form.email.trim(),
             rol: rolToFirestore[form.rol],
             equipo: form.equipo,
-            tipoCurso: form.tipoCurso,
             activo: form.estado === 'Activo',
+            creadoEn: serverTimestamp(),
           })
         } finally {
           await secondarySignOut(secondaryAuth)
           await disposeSecondaryApp()
         }
         setToast('Colaborador creado correctamente.')
+        closeModal()
+        setHorarioSetup({ userId: uid, nombre: form.nombre.trim(), email: form.email.trim(), rol: form.rol })
+        setHorarioForm(emptyHorarioForm)
+        setHorarioError(null)
+        return
       }
       closeModal()
     } catch (err) {
@@ -273,35 +300,69 @@ export default function Colaboradores() {
     }
   }
 
-  async function handleDeleteConfirm() {
-    if (!deleting) return
-    setDeletingBusy(true)
+  function closeHorarioSetup() {
+    setHorarioSetup(null)
+    setHorarioForm(emptyHorarioForm)
+    setHorarioError(null)
+  }
+
+  function toggleHorarioDia(d: Dia) {
+    setHorarioForm((prev) => ({
+      ...prev,
+      dias: prev.dias.includes(d) ? prev.dias.filter((x) => x !== d) : [...prev.dias, d],
+    }))
+  }
+
+  async function handleHorarioSetupSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!horarioSetup) return
+    const duracionMin = Number(horarioForm.duracionHoras || 0) * 60 + Number(horarioForm.duracionMinutos || 0)
+    if (!horarioForm.cursoId) {
+      setHorarioError('Elegí un curso.')
+      return
+    }
+    if (horarioForm.dias.length === 0) {
+      setHorarioError('Seleccioná al menos un día.')
+      return
+    }
+    if (!horarioForm.hora) {
+      setHorarioError('Seleccioná una hora.')
+      return
+    }
+    if (duracionMin <= 0) {
+      setHorarioError('Ingresá una duración válida.')
+      return
+    }
+    setHorarioError(null)
+    setHorarioSubmitting(true)
     try {
-      const uid = deleting.id
-      const cursoIds = inscripciones.filter((i) => i.userId === uid).map((i) => i.cursoId)
-
-      const batch = writeBatch(db)
-      cursoIds.forEach((cursoId) => {
-        batch.delete(doc(db, 'cursos', cursoId, 'inscripciones', uid))
-        batch.delete(doc(db, 'horarios', `${cursoId}_${uid}`))
-        batch.update(doc(db, 'cursos', cursoId), { inscritos: increment(-1) })
+      const { userId, nombre, email, rol } = horarioSetup
+      const { cursoId } = horarioForm
+      await setDoc(doc(db, 'cursos', cursoId, 'inscripciones', userId), {
+        userId,
+        nombre,
+        email,
+        rol,
+        asignadoEn: serverTimestamp(),
       })
-      batch.delete(doc(db, 'users', uid))
-      await batch.commit()
-
-      const avancesSnap = await getDocs(query(collection(db, 'avances'), where('userId', '==', uid)))
-      if (!avancesSnap.empty) {
-        const batch2 = writeBatch(db)
-        avancesSnap.forEach((d) => batch2.delete(d.ref))
-        await batch2.commit()
-      }
-
-      setToast(`${deleting.nombre} eliminado permanentemente.`)
-      setDeleting(null)
+      await updateDoc(doc(db, 'cursos', cursoId), { inscritos: increment(1) })
+      await setDoc(doc(db, 'horarios', `${cursoId}_${userId}`), {
+        userId,
+        cursoId,
+        modo: 'semanal',
+        dias: horarioForm.dias,
+        fechas: [],
+        hora: horarioForm.hora,
+        duracionMin,
+        vigenciaInicio: todayIso(),
+        vigenciaFin: null,
+      })
+      setToast(`Curso y horario asignados a ${nombre}.`)
+      closeHorarioSetup()
     } catch {
-      setToast(null)
+      setHorarioError('No se pudo guardar el curso y horario. Intentá de nuevo.')
     } finally {
-      setDeletingBusy(false)
+      setHorarioSubmitting(false)
     }
   }
 
@@ -354,7 +415,60 @@ export default function Colaboradores() {
         </button>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {(['Todos', ...estados] as const).map((es) => (
+            <button
+              key={es}
+              type="button"
+              onClick={() => setEstadoFiltro(es)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                estadoFiltro === es
+                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-400'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              {es}
+            </button>
+          ))}
+          <span className="mx-1 w-px self-stretch bg-gray-200 dark:bg-gray-700" />
+          {(['Todos', ...equipos] as const).map((eq) => (
+            <button
+              key={eq}
+              type="button"
+              onClick={() => setEquipoFiltro(eq)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                equipoFiltro === eq
+                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-400'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              {eq}
+            </button>
+          ))}
+          <span className="mx-1 w-px self-stretch bg-gray-200 dark:bg-gray-700" />
+          {(['Todos', ...roles] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRolFiltro(r)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                rolFiltro === r
+                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-400'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Select
+            value={orden}
+            onChange={(v) => setOrden(v as OrdenOpcion)}
+            className="w-44"
+            options={ordenOpciones.map((o) => ({ value: o.value, label: o.label }))}
+          />
         <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
@@ -375,6 +489,7 @@ export default function Colaboradores() {
             </button>
           )}
         </div>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
@@ -386,9 +501,6 @@ export default function Colaboradores() {
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Correo</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Rol</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Equipo</th>
-                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
-                  Tipo de curso
-                </th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">
                   Curso asociado
                 </th>
@@ -402,14 +514,14 @@ export default function Colaboradores() {
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={`skeleton-${i}`}>
-                    <td colSpan={8} className="px-5 py-4">
+                    <td colSpan={7} className="px-5 py-4">
                       <div className="h-4 w-full animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                     </td>
                   </tr>
                 ))
               ) : colaboradoresFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12">
+                  <td colSpan={7} className="px-5 py-12">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Inbox className="h-8 w-8" />
                       <p className="text-sm">
@@ -435,7 +547,6 @@ export default function Colaboradores() {
                       <td className="px-5 py-3 text-gray-400 dark:text-gray-500">{c.email}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.rol}</td>
                       <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.equipo ?? '–'}</td>
-                      <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipoCurso ?? '–'}</td>
                       <td className="max-w-[220px] px-5 py-3 text-gray-600 dark:text-gray-400">
                         {(() => {
                           if (!cursos || cursos.length === 0) return 'Sin curso asignado'
@@ -504,14 +615,6 @@ export default function Colaboradores() {
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleting(c)}
-                            title="Eliminar colaborador"
-                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -558,7 +661,7 @@ export default function Colaboradores() {
                   id="nombre"
                   type="text"
                   value={form.nombre}
-                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  onChange={(e) => setForm({ ...form, nombre: capitalizarPalabras(e.target.value) })}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
@@ -572,7 +675,7 @@ export default function Colaboradores() {
                   type="email"
                   disabled={!!editingId}
                   value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  onChange={(e) => setForm({ ...form, email: e.target.value.toLowerCase() })}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                 />
               </div>
@@ -582,71 +685,85 @@ export default function Colaboradores() {
                   <label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Contraseña
                   </label>
-                  <input
-                    id="password"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    placeholder="Mínimo 8 caracteres y un número"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  />
+                  <div className="relative mt-1">
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      placeholder="Mínimo 8 caracteres y un número"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      className="absolute top-1/2 right-2.5 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
               )}
 
               <div>
-                <label htmlFor="rol" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Rol
-                </label>
-                <Select
-                  id="rol"
-                  value={form.rol}
-                  onChange={(v) => setForm({ ...form, rol: v as Rol })}
-                  placeholder="Seleccionar..."
-                  className="mt-1"
-                  options={roles}
-                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Rol</span>
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                  {roles.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setForm({ ...form, rol: r })}
+                      className={`rounded-lg px-2 py-2 text-xs font-medium transition-all ${
+                        form.rol === r
+                          ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-950 dark:text-indigo-400'
+                          : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
-                <label htmlFor="equipo" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Equipo
-                </label>
-                <Select
-                  id="equipo"
-                  value={form.equipo}
-                  onChange={(v) => setForm({ ...form, equipo: v as Equipo })}
-                  placeholder="Seleccionar..."
-                  className="mt-1"
-                  options={equipos}
-                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Equipo</span>
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                  {equipos.map((eq) => (
+                    <button
+                      key={eq}
+                      type="button"
+                      onClick={() => setForm({ ...form, equipo: eq })}
+                      className={`rounded-lg px-2 py-2 text-xs font-medium transition-all ${
+                        form.equipo === eq
+                          ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-950 dark:text-indigo-400'
+                          : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      {eq}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
-                <label htmlFor="tipoCurso" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Tipo de curso
-                </label>
-                <Select
-                  id="tipoCurso"
-                  value={form.tipoCurso}
-                  onChange={(v) => setForm({ ...form, tipoCurso: v as TipoCurso })}
-                  placeholder="Seleccionar..."
-                  className="mt-1"
-                  options={tiposCurso}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="estado" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Estado
-                </label>
-                <Select
-                  id="estado"
-                  value={form.estado}
-                  onChange={(v) => setForm({ ...form, estado: v as Estado })}
-                  placeholder="Seleccionar..."
-                  className="mt-1"
-                  options={estados}
-                />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Estado</span>
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                  {estados.map((es) => (
+                    <button
+                      key={es}
+                      type="button"
+                      onClick={() => setForm({ ...form, estado: es })}
+                      className={`rounded-lg px-2 py-2 text-xs font-medium transition-all ${
+                        form.estado === es
+                          ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-950 dark:text-indigo-400'
+                          : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      {es}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
@@ -672,42 +789,132 @@ export default function Colaboradores() {
         </div>
       )}
 
-      {deleting && (
+      {horarioSetup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-            <div className="flex items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                <TriangleAlert className="h-5.5 w-5.5" />
-              </span>
+          <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5 dark:border-gray-800">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  ¿Eliminar a {deleting.nombre}?
-                </h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Esta acción no se puede deshacer. Se eliminará permanentemente el colaborador y
-                  todos sus datos asociados: inscripciones, horarios y avances reportados.
+                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Asignar curso y horario</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {horarioSetup.nombre} · podés hacerlo ahora o más tarde desde Horarios.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={closeHorarioSetup}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleting(null)}
-                disabled={deletingBusy}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteConfirm}
-                disabled={deletingBusy}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-60"
-              >
-                {deletingBusy ? 'Eliminando...' : 'Sí, eliminar por completo'}
-              </button>
-            </div>
+            <form onSubmit={handleHorarioSetupSubmit} className="flex flex-col gap-4 overflow-y-auto px-6 py-5">
+              <div>
+                <label htmlFor="horarioCurso" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Curso
+                </label>
+                <Select
+                  id="horarioCurso"
+                  value={horarioForm.cursoId}
+                  onChange={(v) => setHorarioForm({ ...horarioForm, cursoId: v })}
+                  placeholder="Seleccionar..."
+                  className="mt-1"
+                  options={Object.entries(cursoNombres).map(([id, nombre]) => ({ value: id, label: nombre }))}
+                  searchable
+                />
+              </div>
+
+              <div>
+                <span className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Días de la semana
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {dias.map((d) => {
+                    const activo = horarioForm.dias.includes(d)
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        title={d}
+                        onClick={() => toggleHorarioDia(d)}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold transition ${
+                          activo
+                            ? 'bg-blue-600 text-white shadow-sm ring-4 ring-blue-100 dark:bg-indigo-500 dark:ring-indigo-500/20'
+                            : 'border border-gray-300 text-gray-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 dark:border-gray-700 dark:text-gray-400 dark:hover:border-indigo-400 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400'
+                        }`}
+                      >
+                        {diaCorto[d]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label htmlFor="horarioSetupHora" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Hora
+                  </label>
+                  <TimePicker
+                    id="horarioSetupHora"
+                    value={horarioForm.hora}
+                    onChange={(hora) => setHorarioForm({ ...horarioForm, hora })}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="horarioHoras"
+                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Horas
+                  </label>
+                  <input
+                    id="horarioHoras"
+                    type="number"
+                    min="0"
+                    value={horarioForm.duracionHoras}
+                    onChange={(e) => setHorarioForm({ ...horarioForm, duracionHoras: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="horarioMinutos"
+                    className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    Minutos
+                  </label>
+                  <input
+                    id="horarioMinutos"
+                    type="number"
+                    min="0"
+                    step="15"
+                    value={horarioForm.duracionMinutos}
+                    onChange={(e) => setHorarioForm({ ...horarioForm, duracionMinutos: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  />
+                </div>
+              </div>
+
+              {horarioError && <p className="text-sm text-red-600 dark:text-red-400">{horarioError}</p>}
+
+              <div className="mt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeHorarioSetup}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Más tarde
+                </button>
+                <button
+                  type="submit"
+                  disabled={horarioSubmitting}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+                >
+                  {horarioSubmitting ? 'Guardando...' : 'Asignar curso y horario'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarCog, CheckCircle2 } from 'lucide-react'
 import {
+  addDoc,
   collection,
   collectionGroup,
   doc,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import DatePicker from './DatePicker'
@@ -17,6 +20,13 @@ import Select from './Select'
 type Usuario = {
   id: string
   nombre: string
+}
+
+type Curso = {
+  id: string
+  nombre: string
+  tipo: string
+  duracionValor: number
 }
 
 type Inscripcion = {
@@ -31,7 +41,7 @@ function parseIsoToDate(iso: string): Date {
 
 export default function AjustarCompletado() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [cursosPorId, setCursosPorId] = useState<Record<string, string>>({})
+  const [cursosPorId, setCursosPorId] = useState<Record<string, Curso>>({})
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([])
 
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
@@ -41,6 +51,7 @@ export default function AjustarCompletado() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [guardado, setGuardado] = useState(false)
+  const [fechaActual, setFechaActual] = useState<Timestamp | null>(null)
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('nombre'))
@@ -53,9 +64,15 @@ export default function AjustarCompletado() {
 
   useEffect(() => {
     return onSnapshot(collection(db, 'cursos'), (snap) => {
-      const map: Record<string, string> = {}
+      const map: Record<string, Curso> = {}
       snap.docs.forEach((d) => {
-        map[d.id] = (d.data().nombre as string) ?? d.id
+        const data = d.data()
+        map[d.id] = {
+          id: d.id,
+          nombre: (data.nombre as string) ?? d.id,
+          tipo: (data.tipo as string) ?? '',
+          duracionValor: (data.duracionValor as number) ?? 0,
+        }
       })
       setCursosPorId(map)
     })
@@ -81,8 +98,10 @@ export default function AjustarCompletado() {
     if (!selectedUserId) return []
     return inscripciones
       .filter((i) => i.userId === selectedUserId)
-      .map((i) => ({ id: i.cursoId, nombre: cursosPorId[i.cursoId] ?? i.cursoId }))
+      .map((i) => cursosPorId[i.cursoId] ?? { id: i.cursoId, nombre: i.cursoId, tipo: '', duracionValor: 0 })
   }, [selectedUserId, inscripciones, cursosPorId])
+
+  const cursoSeleccionado = selectedCursoId ? (cursosPorId[selectedCursoId] ?? null) : null
 
   useEffect(() => {
     setSelectedCursoId(null)
@@ -97,24 +116,98 @@ export default function AjustarCompletado() {
     setSinFecha(false)
     setError(null)
     setGuardado(false)
-  }, [selectedCursoId])
+    setFechaActual(null)
+    if (!selectedUserId || !selectedCursoId) return
+    return onSnapshot(doc(db, 'cursos', selectedCursoId, 'inscripciones', selectedUserId), (snap) => {
+      const f = snap.data()?.fechaCompletado as Timestamp | undefined
+      setFechaActual(f ?? null)
+    })
+  }, [selectedUserId, selectedCursoId])
 
   async function handleGuardar() {
-    if (!selectedUserId || !selectedCursoId || (!sinFecha && !fecha)) {
+    if (!selectedUserId || !selectedCursoId || (!sinFecha && !fecha) || !cursoSeleccionado) {
       setError('Selecciona usuario, curso y fecha (o marca "Sin fecha").')
       return
     }
     setError(null)
     setGuardando(true)
     try {
-      await updateDoc(doc(db, 'cursos', selectedCursoId, 'inscripciones', selectedUserId), {
-        completado: true,
-        confirmado: true,
-        fechaCompletado: sinFecha ? null : Timestamp.fromDate(parseIsoToDate(fecha)),
-      })
+      const esEC = cursoSeleccionado.tipo === 'Educación Continua'
+      const fechaCompletado = sinFecha ? null : Timestamp.fromDate(parseIsoToDate(fecha))
+
+      if (esEC) {
+        await addDoc(collection(db, 'avances'), {
+          userId: selectedUserId,
+          cursoId: selectedCursoId,
+          fecha: sinFecha ? '' : fecha,
+          aprendizaje: 'Curso completado (ajuste administrativo).',
+          comentario: null,
+          creadoEn: serverTimestamp(),
+        })
+        await updateDoc(doc(db, 'cursos', selectedCursoId, 'inscripciones', selectedUserId), {
+          completado: true,
+          confirmado: true,
+          fechaCompletado,
+        })
+      } else {
+        const total = cursoSeleccionado.duracionValor
+        if (total <= 0) {
+          setError('Este curso no tiene una duración configurada, no se puede completar.')
+          setGuardando(false)
+          return
+        }
+        const avancesSnap = await new Promise<number>((resolve, reject) => {
+          const q = query(
+            collection(db, 'avances'),
+            where('userId', '==', selectedUserId),
+            where('cursoId', '==', selectedCursoId),
+          )
+          const unsub = onSnapshot(
+            q,
+            (snap) => {
+              unsub()
+              let maxLeccion = 0
+              snap.docs.forEach((d) => {
+                const f = d.data().leccionFinal as number | undefined
+                if (typeof f === 'number' && f > maxLeccion) maxLeccion = f
+              })
+              resolve(maxLeccion)
+            },
+            reject,
+          )
+        })
+
+        if (avancesSnap >= total) {
+          setError('Este colaborador ya completó todas las lecciones de este curso.')
+          setGuardando(false)
+          return
+        }
+
+        const leccionInicial = avancesSnap + 1
+        const leccionFinal = total
+
+        await addDoc(collection(db, 'avances'), {
+          userId: selectedUserId,
+          cursoId: selectedCursoId,
+          fecha: sinFecha ? '' : fecha,
+          horaInicio: '00:00',
+          horaFin: '00:00',
+          lecciones: leccionFinal - leccionInicial + 1,
+          leccionInicial,
+          leccionFinal,
+          aprendizaje: 'Curso completado (ajuste administrativo).',
+          comentario: null,
+          creadoEn: serverTimestamp(),
+        })
+        await updateDoc(doc(db, 'cursos', selectedCursoId, 'inscripciones', selectedUserId), {
+          completado: true,
+          confirmado: true,
+          fechaCompletado,
+        })
+      }
       setGuardado(true)
     } catch {
-      setError('No se pudo guardar el cambio. Intentá de nuevo.')
+      setError('No se pudo guardar el avance. Intentá de nuevo.')
     } finally {
       setGuardando(false)
     }
@@ -128,10 +221,10 @@ export default function AjustarCompletado() {
         </span>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Ajustar fecha de completado
+            Registrar completado (ajuste)
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Corrige la fecha en que un colaborador completó un curso.
+            Registra un avance del 100% para un colaborador, con la fecha que elijas.
           </p>
         </div>
       </div>
@@ -174,8 +267,20 @@ export default function AjustarCompletado() {
         {selectedCursoId && (
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
-              Nueva fecha de completado {!sinFecha && <span className="text-red-500">*</span>}
+              Fecha de completado {!sinFecha && <span className="text-red-500">*</span>}
             </label>
+            {fechaActual && (
+              <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                Ya tiene fecha de completado:{' '}
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {fechaActual.toDate().toLocaleDateString('es-CO', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </span>
+              </p>
+            )}
             <DatePicker value={fecha} onChange={setFecha} disabled={sinFecha} />
             <label className="mt-2 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
               <input
@@ -200,13 +305,13 @@ export default function AjustarCompletado() {
           disabled={guardando || !selectedUserId || !selectedCursoId || (!sinFecha && !fecha)}
           className="w-full rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-600"
         >
-          {guardando ? 'Guardando...' : 'Guardar cambio'}
+          {guardando ? 'Guardando...' : 'Guardar avance'}
         </button>
 
         {guardado && (
           <p className="flex items-center justify-center gap-1.5 text-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            Fecha de completado actualizada correctamente.
+            Avance registrado correctamente.
           </p>
         )}
       </div>

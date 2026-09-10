@@ -62,9 +62,16 @@ type TimePickerProps = {
   onChange: (hora: string) => void
   disabled?: boolean
   placeholder?: string
+  id?: string
 }
 
-export default function TimePicker({ value, onChange, disabled, placeholder = 'Seleccionar hora' }: TimePickerProps) {
+export default function TimePicker({
+  value,
+  onChange,
+  disabled,
+  placeholder = 'Seleccionar hora',
+  id,
+}: TimePickerProps) {
   const [open, setOpen] = useState(false)
   const [texto, setTexto] = useState(value ? formatHora(value) : '')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -126,6 +133,7 @@ export default function TimePicker({ value, onChange, disabled, placeholder = 'S
       >
         <Clock className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
         <input
+          id={id}
           ref={inputRef}
           type="text"
           inputMode="numeric"

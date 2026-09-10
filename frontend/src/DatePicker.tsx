@@ -38,6 +38,7 @@ type DatePickerProps = {
   maxDate?: string
   disabled?: boolean
   placeholder?: string
+  id?: string
 }
 
 export default function DatePicker({
@@ -47,6 +48,7 @@ export default function DatePicker({
   maxDate,
   disabled,
   placeholder = 'Seleccionar fecha',
+  id,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false)
   const [yearPickerOpen, setYearPickerOpen] = useState(false)
@@ -91,6 +93,7 @@ export default function DatePicker({
   return (
     <div className="relative" ref={containerRef}>
       <button
+        id={id}
         type="button"
         disabled={disabled}
         onClick={toggleOpen}

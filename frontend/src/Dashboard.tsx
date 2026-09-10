@@ -17,6 +17,7 @@ import { collection, collectionGroup, onSnapshot, type Timestamp } from 'firebas
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import DatePicker from './DatePicker'
 import Select from './Select'
+import ButtonGroup from './ButtonGroup'
 import { db } from './firebase'
 import { type Dia, type Modo, addDays, dateToIso, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
 import Tablero from './Tablero'
@@ -607,55 +608,59 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
           <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <div className="flex flex-wrap items-end gap-4">
               <div className="w-44">
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label htmlFor="dashDesde" className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Desde
                 </label>
-                <DatePicker value={rangoDesde} onChange={setRangoDesde} maxDate={rangoHasta || undefined} />
+                <DatePicker id="dashDesde" value={rangoDesde} onChange={setRangoDesde} maxDate={rangoHasta || undefined} />
               </div>
               <div className="w-44">
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label htmlFor="dashHasta" className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Hasta
                 </label>
-                <DatePicker value={rangoHasta} onChange={setRangoHasta} minDate={rangoDesde || undefined} />
+                <DatePicker id="dashHasta" value={rangoHasta} onChange={setRangoHasta} minDate={rangoDesde || undefined} />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Equipo
-                </label>
-                <Select
+                </span>
+                <ButtonGroup
                   value={equipo}
                   onChange={setEquipo}
-                  className="w-36"
+                  className="w-40"
                   options={['Todas', 'Colombia', 'USA']}
+                  ariaLabel="Equipo"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Tipo de curso
-                </label>
-                <Select
+                </span>
+                <ButtonGroup
                   value={tipoCurso}
                   onChange={setTipoCurso}
-                  className="w-44"
+                  className="w-96"
                   options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
+                  ariaLabel="Tipo de curso"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <span className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Estado
-                </label>
-                <Select
+                </span>
+                <ButtonGroup
                   value={estado}
                   onChange={setEstado}
-                  className="w-36"
+                  className="w-80"
                   options={['Todos', 'Reportó', 'Pendiente', 'No reportó']}
+                  ariaLabel="Estado"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label htmlFor="dashUsuario" className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Usuario
                 </label>
                 <Select
+                  id="dashUsuario"
                   value={usuarioFiltro}
                   onChange={setUsuarioFiltro}
                   className="w-48"
@@ -664,12 +669,13 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <label htmlFor="dashBuscar" className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                   Buscar
                 </label>
                 <div className="relative w-56">
                   <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <input
+                    id="dashBuscar"
                     type="text"
                     value={busquedaGeneral}
                     onChange={(e) => setBusquedaGeneral(e.target.value)}
@@ -689,9 +695,9 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                <span aria-hidden="true" className="mb-1 block text-sm font-medium">
                   &nbsp;
-                </label>
+                </span>
                 <button
                   type="button"
                   onClick={() => setMostrarTodo((v) => !v)}

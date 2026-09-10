@@ -81,9 +81,10 @@ const emptyFormEC = {
 
 type RegistrarAvanceProps = {
   readonly userId: string
+  readonly preselectCursoId?: string | null
 }
 
-export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
+export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarAvanceProps) {
   const [cursosPorId, setCursosPorId] = useState<Record<string, Curso>>({})
   const [cursoIds, setCursoIds] = useState<string[]>([])
   const [horariosPorCurso, setHorariosPorCurso] = useState<Record<string, Horario>>({})
@@ -162,10 +163,12 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
       setSelectedCursoId(cursoIds[0])
     } else if (cursoIds.length === 0) {
       setSelectedCursoId(null)
+    } else if (preselectCursoId && cursoIds.includes(preselectCursoId)) {
+      setSelectedCursoId(preselectCursoId)
     } else {
       setSelectedCursoId((prev) => (prev && cursoIds.includes(prev) ? prev : null))
     }
-  }, [cursoIds])
+  }, [cursoIds, preselectCursoId])
 
   const cursoSeleccionado = selectedCursoId ? (cursosPorId[selectedCursoId] ?? null) : null
   const esEducacionContinua = cursoSeleccionado?.tipo === 'Educación Continua'
@@ -235,6 +238,11 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
   function capituloDeLeccion(leccion: number): number | null {
     const c = capitulosInfo.find((c) => leccion >= c.inicio && leccion <= c.fin)
     return c?.numero ?? null
+  }
+
+  function leccionRelativa(leccion: number): number {
+    const c = capitulosInfo.find((c) => leccion >= c.inicio && leccion <= c.fin)
+    return c ? leccion - c.inicio + 1 : leccion
   }
 
   const leccionesInfo = useMemo(() => {
@@ -673,8 +681,8 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                           className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
                         >
                           {r.leccionInicial === r.leccionFinal
-                            ? r.leccionInicial
-                            : `${r.leccionInicial}–${r.leccionFinal}`}
+                            ? leccionRelativa(r.leccionInicial)
+                            : `${leccionRelativa(r.leccionInicial)}–${leccionRelativa(r.leccionFinal)}`}
                           {capTag}
                         </span>
                       )
@@ -693,13 +701,15 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                         Lecciones de esta sesión <span className="text-red-500">*</span>
                       </label>
                       <span className="text-xs text-gray-400 dark:text-gray-500">
-                        {form.leccionFinal
-                          ? `Seleccionado: ${proximaLeccion}–${form.leccionFinal}`
-                          : `Próxima lección: ${proximaLeccion}`}
+                        {form.leccionFinal && proximaLeccion !== null
+                          ? `Seleccionado: ${leccionRelativa(proximaLeccion)}–${leccionRelativa(Number(form.leccionFinal))}`
+                          : proximaLeccion !== null
+                            ? `Próxima lección: ${leccionRelativa(proximaLeccion)}`
+                            : ''}
                       </span>
                     </div>
                     <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
-                      Empezás automáticamente desde la lección {proximaLeccion}. Tocá hasta dónde llegaste. Las
+                      Empezás automáticamente desde la lección {proximaLeccion !== null ? leccionRelativa(proximaLeccion) : ''}. Tocá hasta dónde llegaste. Las
                       lecciones en gris ya fueron registradas antes.
                     </p>
                     <div className="flex flex-col gap-3">
@@ -738,7 +748,7 @@ export default function RegistrarAvance({ userId }: RegistrarAvanceProps) {
                                   onClick={() => handleClickLeccion(n)}
                                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold transition-colors ${estilo}`}
                                 >
-                                  {n}
+                                  {leccionRelativa(n)}
                                 </button>
                               )
                             })}

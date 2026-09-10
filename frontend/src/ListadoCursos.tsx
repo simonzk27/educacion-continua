@@ -36,17 +36,16 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import Select from './Select'
+import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 
 type Estado = 'Activo' | 'Inactivo' | 'Próximo'
 type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
-type DuracionUnidad = 'Semanas' | 'Lecciones'
+type DuracionUnidad = 'Lecciones'
 type Tab = 'Todos los cursos' | Tipo
 
 type Curso = {
   id: string
   nombre: string
-  categoria: string
-  instructor: string
   duracionValor: number
   duracionUnidad: DuracionUnidad
   inscritos: number
@@ -54,6 +53,7 @@ type Curso = {
   tipo: Tipo
   link: string | null
   capitulos: number[] | null
+  creadoEn: { toMillis: () => number } | null
 }
 
 const estadoStyles: Record<Estado, string> = {
@@ -76,15 +76,12 @@ function normalizar(texto: string): string {
 }
 
 const estados: Estado[] = ['Activo', 'Inactivo', 'Próximo']
-const duracionUnidades: DuracionUnidad[] = ['Semanas', 'Lecciones']
 const tabs: Tab[] = ['Todos los cursos', 'Educación Continua', 'Academia', 'Unimetab']
 
 const emptyForm = {
   nombre: '',
-  categoria: '',
-  instructor: '',
   duracionValor: '',
-  duracionUnidad: 'Semanas' as DuracionUnidad,
+  duracionUnidad: 'Lecciones' as DuracionUnidad,
   estado: '' as Estado | '',
   tipo: '' as Tipo | '',
   link: '',
@@ -123,6 +120,7 @@ export default function ListadoCursos() {
   const [search, setSearch] = useState('')
   const [asignacionFiltro, setAsignacionFiltro] = useState<AsignacionFiltro>('Todos')
   const [cursoSearch, setCursoSearch] = useState('')
+  const [orden, setOrden] = useState<OrdenOpcion>('az')
   const [page, setPage] = useState(1)
 
   const [deleting, setDeleting] = useState<Curso | null>(null)
@@ -170,13 +168,19 @@ export default function ListadoCursos() {
   const porTab = tab === 'Todos los cursos' ? cursos : cursos.filter((c) => c.tipo === tab)
   const terminoCurso = normalizar(cursoSearch.trim())
   const palabrasCurso = terminoCurso.split(/\s+/).filter(Boolean)
-  const filtrados =
+  const filtradosSinOrden =
     palabrasCurso.length === 0
       ? porTab
       : porTab.filter((c) => {
-          const texto = normalizar(`${c.nombre} ${c.categoria} ${c.instructor}`)
+          const texto = normalizar(c.nombre)
           return palabrasCurso.every((p) => texto.includes(p))
         })
+  const filtrados = ordenarPorNombreYFecha(
+    filtradosSinOrden,
+    orden,
+    (c) => c.nombre,
+    (c) => c.creadoEn,
+  )
 
   function openAssignModal(curso: Curso) {
     setAssignCurso(curso)
@@ -244,6 +248,8 @@ export default function ListadoCursos() {
   )
 
   const totalLeccionesForm = form.capitulos.reduce((acc, v) => acc + (Number(v) > 0 ? Number(v) : 0), 0)
+  const formEsUnimetab = form.tipo === 'Unimetab'
+  const formEsEC = form.tipo === 'Educación Continua'
 
   function rangoCapitulo(index: number): { inicio: number; fin: number } | null {
     const n = Number(form.capitulos[index])
@@ -267,8 +273,6 @@ export default function ListadoCursos() {
     setEditingId(curso.id)
     setForm({
       nombre: curso.nombre,
-      categoria: curso.categoria,
-      instructor: curso.instructor,
       duracionValor: String(curso.duracionValor),
       duracionUnidad: curso.duracionUnidad,
       estado: curso.estado,
@@ -293,15 +297,10 @@ export default function ListadoCursos() {
     setFormError(null)
 
     const esUnimetab = form.tipo === 'Unimetab'
+    const esEC = form.tipo === 'Educación Continua'
     const capitulosNums = form.capitulos.map((c) => Number(c))
 
-    if (
-      !form.nombre.trim() ||
-      !form.categoria.trim() ||
-      !form.instructor.trim() ||
-      !form.estado ||
-      !form.tipo
-    ) {
+    if (!form.nombre.trim() || !form.estado || !form.tipo) {
       setFormError('Completá todos los campos.')
       return
     }
@@ -310,7 +309,11 @@ export default function ListadoCursos() {
     let duracionUnidad: DuracionUnidad
     let capitulos: number[] | null
 
-    if (esUnimetab) {
+    if (esEC) {
+      duracionValor = 1
+      duracionUnidad = 'Lecciones'
+      capitulos = null
+    } else if (esUnimetab) {
       if (
         capitulosNums.length === 0 ||
         capitulosNums.some((n) => !Number.isInteger(n) || n <= 0)
@@ -335,20 +338,18 @@ export default function ListadoCursos() {
     try {
       const payload = {
         nombre: form.nombre.trim(),
-        categoria: form.categoria.trim(),
-        instructor: form.instructor.trim(),
         duracionValor,
         duracionUnidad,
         estado: form.estado,
         tipo: form.tipo,
-        link: form.link.trim() || null,
+        link: esEC ? form.link.trim() || null : null,
         capitulos,
       }
       if (editingId) {
         await updateDoc(doc(db, 'cursos', editingId), payload)
         setToast('Curso actualizado correctamente.')
       } else {
-        await addDoc(collection(db, 'cursos'), { ...payload, inscritos: 0 })
+        await addDoc(collection(db, 'cursos'), { ...payload, inscritos: 0, creadoEn: serverTimestamp() })
         setToast('Curso creado correctamente.')
       }
       closeModal()
@@ -423,14 +424,20 @@ export default function ListadoCursos() {
         ))}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <Select
+          value={orden}
+          onChange={(v) => setOrden(v as OrdenOpcion)}
+          className="w-full sm:w-44"
+          options={ordenOpciones.map((o) => ({ value: o.value, label: o.label }))}
+        />
         <div className="relative w-full sm:w-72">
           <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={cursoSearch}
             onChange={(e) => setCursoSearch(e.target.value)}
-            placeholder="Buscar por nombre, categoría o instructor..."
+            placeholder="Buscar por nombre..."
             className="w-full rounded-lg border border-gray-300 py-2 pr-9 pl-9 text-sm text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
           />
           {cursoSearch && (
@@ -453,8 +460,6 @@ export default function ListadoCursos() {
               <tr className="border-b border-gray-100 text-xs font-semibold tracking-wide text-gray-400 uppercase dark:border-gray-800 dark:text-gray-500">
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Curso</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Tipo</th>
-                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Categoría</th>
-                <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Instructor</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Duración</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Inscritos</th>
                 <th className="sticky top-0 z-10 bg-gray-50 px-5 py-3 font-semibold dark:bg-gray-950">Estado</th>
@@ -474,12 +479,6 @@ export default function ListadoCursos() {
                       <div className="h-4 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                     </td>
                     <td className="px-5 py-3">
-                      <div className="h-4 w-24 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="h-4 w-28 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
-                    </td>
-                    <td className="px-5 py-3">
                       <div className="h-4 w-16 animate-pulse rounded bg-gray-100 dark:bg-gray-800" />
                     </td>
                     <td className="px-5 py-3">
@@ -493,7 +492,7 @@ export default function ListadoCursos() {
                 ))
               ) : filtrados.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10">
+                  <td colSpan={6} className="px-5 py-10">
                     <div className="flex flex-col items-center gap-2 text-gray-400 dark:text-gray-500">
                       <Inbox className="h-8 w-8" />
                       <p className="text-sm">
@@ -506,30 +505,22 @@ export default function ListadoCursos() {
                 filtrados.map((c) => (
                   <tr key={c.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-800/40">
                     <td className="px-5 py-3 font-semibold text-gray-900 dark:text-gray-100">
-                      {c.link ? (
-                        <a
-                          href={c.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 hover:text-blue-600 hover:underline dark:hover:text-indigo-400"
-                        >
-                          {c.nombre}
-                          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                        </a>
-                      ) : (
-                        c.nombre
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipo}</td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.categoria}</td>
-                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-                          {iniciales(c.instructor)}
-                        </span>
-                        {c.instructor}
+                      <span className="inline-flex items-center gap-1.5">
+                        {c.nombre}
+                        {c.link && (
+                          <a
+                            href={c.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Abrir enlace externo"
+                            className="shrink-0 text-gray-400 transition-colors hover:text-blue-600 dark:hover:text-indigo-400"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
                       </span>
                     </td>
+                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{c.tipo}</td>
                     <td className="px-5 py-3 text-gray-600 dark:text-gray-400">
                       {c.duracionValor} {c.duracionUnidad.toLowerCase()}
                     </td>
@@ -619,33 +610,6 @@ export default function ListadoCursos() {
                     className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
                   />
                 </div>
-
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label htmlFor="categoria" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Categoría
-                    </label>
-                    <input
-                      id="categoria"
-                      type="text"
-                      value={form.categoria}
-                      onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label htmlFor="instructor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Instructor
-                    </label>
-                    <input
-                      id="instructor"
-                      type="text"
-                      value={form.instructor}
-                      onChange={(e) => setForm({ ...form, instructor: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
-                  </div>
-                </div>
               </div>
 
               <hr className="border-gray-100 dark:border-gray-800" />
@@ -677,7 +641,7 @@ export default function ListadoCursos() {
                 </div>
               </div>
 
-              {form.tipo === 'Unimetab' ? (
+              {formEsEC ? null : formEsUnimetab ? (
                 <div className="animate-fade-in rounded-xl border border-gray-200 bg-gray-50/60 p-3.5 dark:border-gray-800 dark:bg-gray-950/40">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -745,50 +709,40 @@ export default function ListadoCursos() {
                   </button>
                 </div>
               ) : (
-                <div className="animate-fade-in flex gap-3">
-                  <div className="flex-1">
-                    <label htmlFor="duracionValor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Duración
-                    </label>
-                    <input
-                      id="duracionValor"
-                      type="number"
-                      min="1"
-                      value={form.duracionValor}
-                      onChange={(e) => setForm({ ...form, duracionValor: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label htmlFor="duracionUnidad" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Unidad
-                    </label>
-                    <Select
-                      id="duracionUnidad"
-                      value={form.duracionUnidad}
-                      onChange={(v) => setForm({ ...form, duracionUnidad: v as DuracionUnidad })}
-                      className="mt-1"
-                      options={duracionUnidades}
-                    />
-                  </div>
+                <div className="animate-fade-in">
+                  <label htmlFor="duracionValor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Duración (lecciones)
+                  </label>
+                  <input
+                    id="duracionValor"
+                    type="number"
+                    min="1"
+                    value={form.duracionValor}
+                    onChange={(e) => setForm({ ...form, duracionValor: e.target.value })}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                  />
                 </div>
               )}
 
-              <hr className="border-gray-100 dark:border-gray-800" />
+              {formEsEC && (
+                <>
+                  <hr className="border-gray-100 dark:border-gray-800" />
 
-              <div>
-                <label htmlFor="link" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Enlace externo <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
-                </label>
-                <input
-                  id="link"
-                  type="url"
-                  value={form.link}
-                  onChange={(e) => setForm({ ...form, link: e.target.value })}
-                  placeholder="https://..."
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                />
-              </div>
+                  <div>
+                    <label htmlFor="link" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Enlace externo <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
+                    </label>
+                    <input
+                      id="link"
+                      type="url"
+                      value={form.link}
+                      onChange={(e) => setForm({ ...form, link: e.target.value })}
+                      placeholder="https://..."
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Estado</span>
