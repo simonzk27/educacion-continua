@@ -21,6 +21,7 @@ export type ViewId =
   | 'listado-cursos'
   | 'alertas'
   | 'ajustar-completado'
+  | 'mi-perfil'
 
 export type NavItem = {
   id: ViewId
@@ -70,3 +71,4 @@ export const navSections: NavSection[] = [
 export const navLabels: Record<ViewId, string> = navSections
   .flatMap((s) => s.items)
   .reduce((acc, item) => ({ ...acc, [item.id]: item.label }), {} as Record<ViewId, string>)
+navLabels['mi-perfil'] = 'Mi perfil'

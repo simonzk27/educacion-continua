@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronsLeft, ChevronsRight, LogOut, Moon, Sun } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, LogOut, Moon, Sun, UserCircle } from 'lucide-react'
 import { navSections, type ViewId } from './nav'
 import type { Theme } from './useTheme'
 
@@ -153,9 +153,20 @@ export default function Sidebar({
                 type="button"
                 onClick={() => {
                   setUserMenuOpen(false)
+                  onNavigate('mi-perfil')
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                <UserCircle className="h-4 w-4 shrink-0" />
+                Mi perfil
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setUserMenuOpen(false)
                   onLogout()
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10"
+                className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:border-gray-800 dark:text-red-400 dark:hover:bg-red-500/10"
               >
                 <LogOut className="h-4 w-4 shrink-0" />
                 Cerrar sesión

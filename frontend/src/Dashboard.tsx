@@ -19,6 +19,7 @@ import DatePicker from './DatePicker'
 import Select from './Select'
 import ButtonGroup from './ButtonGroup'
 import { colorActivoTipoCurso, estiloTipoCurso } from './tipoCursoColors'
+import { iconoEquipo } from './equipoFlags'
 import { db } from './firebase'
 import { type Dia, type Modo, addDays, dateToIso, formatHora, ocurrenciasEntre, todayIso } from './scheduleUtils'
 import Tablero from './Tablero'
@@ -172,7 +173,6 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
   const [estado, setEstado] = useState('Todos')
   const [usuarioFiltro, setUsuarioFiltro] = useState('Todos')
   const [busquedaGeneral, setBusquedaGeneral] = useState('')
-  const [mostrarTodo, setMostrarTodo] = useState(false)
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [cursosPorId, setCursosPorId] = useState<Record<string, Curso>>({})
@@ -333,9 +333,6 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
     if (rangoActivo) {
       desde = rangoDesde
       hasta = rangoHasta
-    } else if (mostrarTodo) {
-      desde = addDays(todayIso(), -1825)
-      hasta = addDays(todayIso(), 1825)
     } else {
       desde = inicioMesIso(todayIso())
       hasta = finMesIso(todayIso())
@@ -345,7 +342,6 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
     rangoActivo,
     rangoDesde,
     rangoHasta,
-    mostrarTodo,
     inscripciones,
     horariosPorKey,
     usuariosPorId,
@@ -470,9 +466,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
               ? 'Matriz de colaboradores y cursos'
               : rangoActivo
                 ? `Del ${formatFechaCorta(rangoDesde)} al ${formatFechaCorta(rangoHasta)}`
-                : mostrarTodo
-                  ? 'Todas las sesiones programadas'
-                  : 'Sesiones del mes actual'}
+                : 'Sesiones del mes actual'}
           </p>
         </div>
       </div>
@@ -630,6 +624,8 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   className="w-40"
                   options={['Todas', 'Colombia', 'USA']}
                   ariaLabel="Equipo"
+                  iconFor={iconoEquipo}
+                  noWrap
                 />
               </div>
               <div>
@@ -696,30 +692,6 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   )}
                 </div>
               </div>
-              <div>
-                <span aria-hidden="true" className="mb-1 block text-sm font-medium">
-                  &nbsp;
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMostrarTodo((v) => !v)}
-                  disabled={rangoActivo}
-                  title={
-                    rangoActivo
-                      ? 'Ya hay un rango de fechas personalizado activo'
-                      : mostrarTodo
-                        ? 'Mostrando todo el historial'
-                        : 'Por defecto solo se muestra el mes actual'
-                  }
-                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                    mostrarTodo
-                      ? 'border-blue-600 bg-blue-600 text-white dark:border-indigo-500 dark:bg-indigo-500'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  Mostrar todo
-                </button>
-              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -730,7 +702,6 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   setUsuarioFiltro('Todos')
                   setEstado('Todos')
                   setBusquedaGeneral('')
-                  setMostrarTodo(false)
                 }}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
               >
@@ -801,7 +772,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                         <td className="px-5 py-3">
                           {f.tipoCurso ? (
                             <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${estiloTipoCurso(f.tipoCurso)?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${estiloTipoCurso(f.tipoCurso)?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
                             >
                               <span className={`h-1.5 w-1.5 rounded-full ${estiloTipoCurso(f.tipoCurso)?.dot ?? 'bg-gray-400'}`} />
                               {f.tipoCurso}

@@ -6,6 +6,7 @@ import Select from './Select'
 import ButtonGroup from './ButtonGroup'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 import { colorActivoTipoCurso, estiloTipoCurso } from './tipoCursoColors'
+import { iconoEquipo } from './equipoFlags'
 
 type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
 
@@ -197,6 +198,8 @@ export default function Tablero({ isAdmin }: TableroProps) {
             onChange={setEquipoFiltro}
             className="w-40"
             options={['Todos', ...equiposOpciones]}
+            iconFor={iconoEquipo}
+            noWrap
           />
         </div>
         <div>
@@ -242,7 +245,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
           onClick={() => setColapsadas(new Set(personasFiltradas.map((p) => p.id)))}
           className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
-          Colapsar todo
+          Minimizar todo
         </button>
         <button
           type="button"
@@ -408,7 +411,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
                               {c.nombre}
                             </p>
                             <span
-                              className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${estilo?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
+                              className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${estilo?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
                             >
                               {c.tipo}
                             </span>

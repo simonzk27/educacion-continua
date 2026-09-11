@@ -5,6 +5,7 @@ import Login from './Login'
 import Sidebar from './Sidebar'
 import MiPanel from './MiPanel'
 import RegistrarAvance from './RegistrarAvance'
+import MiPerfil from './MiPerfil'
 import ComingSoon from './ComingSoon'
 import { useTheme } from './useTheme'
 import { useAuth } from './useAuth'
@@ -55,6 +56,7 @@ function App() {
 
   const vistaPermitida =
     role === 'Admin' ||
+    activeView === 'mi-perfil' ||
     navSections.some((s) => !s.adminOnly && s.items.some((i) => i.id === activeView))
   const vista = vistaPermitida ? activeView : 'mi-panel'
 
@@ -87,6 +89,15 @@ function App() {
     content = <Alertas userId={firebaseUser.uid} />
   } else if (vista === 'ajustar-completado') {
     content = <AjustarCompletado />
+  } else if (vista === 'mi-perfil') {
+    content = (
+      <MiPerfil
+        nombre={nombre}
+        email={firebaseUser.email}
+        rol={role}
+        puedeCambiarPassword={puedeCambiarPassword}
+      />
+    )
   } else {
     content = <ComingSoon title={navLabels[vista]} />
   }

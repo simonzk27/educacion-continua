@@ -528,7 +528,7 @@ export default function ListadoCursos() {
                     </td>
                     <td className="px-5 py-3">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${estiloTipoCurso(c.tipo)?.badge}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${estiloTipoCurso(c.tipo)?.badge}`}
                       >
                         <span className={`h-1.5 w-1.5 rounded-full ${estiloTipoCurso(c.tipo)?.dot}`} />
                         {c.tipo}

@@ -21,6 +21,8 @@ import {
 import { auth, db, getSecondaryAuth, disposeSecondaryApp } from './firebase'
 import Select from './Select'
 import TimePicker from './TimePicker'
+import ButtonGroup from './ButtonGroup'
+import { iconoEquipo } from './equipoFlags'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 import { type Dia, diaCorto, todayIso } from './scheduleUtils'
 
@@ -432,20 +434,15 @@ export default function Colaboradores() {
             </button>
           ))}
           <span className="mx-1 w-px self-stretch bg-gray-200 dark:bg-gray-700" />
-          {(['Todos', ...equipos] as const).map((eq) => (
-            <button
-              key={eq}
-              type="button"
-              onClick={() => setEquipoFiltro(eq)}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                equipoFiltro === eq
-                  ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-indigo-400 dark:bg-indigo-500/10 dark:text-indigo-400'
-                  : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:border-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
-            >
-              {eq}
-            </button>
-          ))}
+          <ButtonGroup
+            value={equipoFiltro}
+            onChange={(v) => setEquipoFiltro(v as Equipo | 'Todos')}
+            className="w-40"
+            options={['Todos', ...equipos]}
+            ariaLabel="Equipo"
+            iconFor={iconoEquipo}
+            noWrap
+          />
           <span className="mx-1 w-px self-stretch bg-gray-200 dark:bg-gray-700" />
           {(['Todos', ...roles] as const).map((r) => (
             <button

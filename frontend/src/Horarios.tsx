@@ -18,6 +18,7 @@ import { addDays, ocurrenciasEntre, formatFechaSesion } from './scheduleUtils'
 import Select from './Select'
 import ButtonGroup from './ButtonGroup'
 import { colorActivoTipoCurso, estiloTipoCurso } from './tipoCursoColors'
+import { iconoEquipo } from './equipoFlags'
 import TimePicker from './TimePicker'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 
@@ -591,6 +592,8 @@ export default function Horarios() {
               className="w-40"
               options={['Todas', 'Colombia', 'USA']}
               ariaLabel="Equipo"
+              iconFor={iconoEquipo}
+              noWrap
             />
           </div>
           <div>
@@ -704,7 +707,7 @@ export default function Horarios() {
                       <td className="px-5 py-3">
                         {f.tipoCurso ? (
                           <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${estiloTipoCurso(f.tipoCurso)?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${estiloTipoCurso(f.tipoCurso)?.badge ?? 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}
                           >
                             <span className={`h-1.5 w-1.5 rounded-full ${estiloTipoCurso(f.tipoCurso)?.dot ?? 'bg-gray-400'}`} />
                             {f.tipoCurso}
