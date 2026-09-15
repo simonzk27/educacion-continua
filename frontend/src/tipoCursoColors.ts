@@ -1,4 +1,4 @@
-export type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia'
+export type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia' | 'Poder del Conocimiento'
 
 type TipoCursoEstilo = {
   badge: string
@@ -33,6 +33,14 @@ export const tipoCursoColores: Record<TipoCurso, TipoCursoEstilo> = {
     borde: 'border-emerald-500 dark:border-emerald-400',
     texto: 'text-emerald-700 dark:text-emerald-400',
     hex: '#10b981',
+  },
+  'Poder del Conocimiento': {
+    badge: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400',
+    activo: 'bg-violet-600 text-white shadow-sm dark:bg-violet-500',
+    dot: 'bg-violet-600 dark:bg-violet-400',
+    borde: 'border-violet-500 dark:border-violet-400',
+    texto: 'text-violet-700 dark:text-violet-400',
+    hex: '#7c3aed',
   },
 }
 

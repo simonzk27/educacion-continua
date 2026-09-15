@@ -23,7 +23,7 @@ import TimePicker from './TimePicker'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 
 type Equipo = 'Colombia' | 'USA'
-type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia'
+type TipoCurso = 'Educación Continua' | 'Unimetab' | 'Academia' | 'Poder del Conocimiento'
 type Estado = 'Activo' | 'Inactivo'
 type Dia = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo'
 
@@ -604,7 +604,7 @@ export default function Horarios() {
               value={tipoCurso}
               onChange={setTipoCurso}
               className="w-96"
-              options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
+              options={['Todos', 'Educación Continua', 'Unimetab', 'Academia', 'Poder del Conocimiento']}
               ariaLabel="Tipo de curso"
               colorFor={colorActivoTipoCurso}
             />

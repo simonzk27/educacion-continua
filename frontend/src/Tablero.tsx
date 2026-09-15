@@ -8,7 +8,7 @@ import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortU
 import { colorActivoTipoCurso, estiloTipoCurso } from './tipoCursoColors'
 import { iconoEquipo } from './equipoFlags'
 
-type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
+type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab' | 'Poder del Conocimiento'
 
 type Curso = {
   id: string
@@ -49,9 +49,9 @@ export default function Tablero({ isAdmin }: TableroProps) {
   const [personasTablero, setPersonasTablero] = useState<PersonaTablero[]>([])
   const [inscripcionesTablero, setInscripcionesTablero] = useState<InscripcionTablero[]>([])
   const [togglingKey, setTogglingKey] = useState<string | null>(null)
-  const [avancesLecciones, setAvancesLecciones] = useState<{ userId: string; cursoId: string; lecciones: number }[]>(
-    [],
-  )
+  const [avancesLecciones, setAvancesLecciones] = useState<
+    { userId: string; cursoId: string; lecciones: number; horas: number }[]
+  >([])
 
   const [equipoFiltro, setEquipoFiltro] = useState('Todos')
   const [tipoCursoFiltro, setTipoCursoFiltro] = useState('Todos')
@@ -127,6 +127,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
             userId: (data.userId as string) ?? '',
             cursoId: (data.cursoId as string) ?? '',
             lecciones: (data.lecciones as number) ?? 0,
+            horas: (data.horas as number) ?? 0,
           }
         }),
       )
@@ -137,7 +138,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
   const avanceExisteSet = new Set<string>()
   avancesLecciones.forEach((a) => {
     const key = `${a.cursoId}_${a.userId}`
-    progresoPorClave.set(key, (progresoPorClave.get(key) ?? 0) + a.lecciones)
+    progresoPorClave.set(key, (progresoPorClave.get(key) ?? 0) + a.lecciones + a.horas)
     avanceExisteSet.add(key)
   })
 
@@ -157,7 +158,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
   const inscripcionesPorClave = new Map(inscripcionesTablero.map((i) => [`${i.cursoId}_${i.userId}`, i]))
 
   const equiposOpciones = ['Colombia', 'USA']
-  const tiposCursoOpciones = ['Educación Continua', 'Unimetab', 'Academia']
+  const tiposCursoOpciones = ['Educación Continua', 'Unimetab', 'Academia', 'Poder del Conocimiento']
 
   const cursosVisibles = cursoFiltro === 'Todos' ? cursos : cursos.filter((c) => c.id === cursoFiltro)
 

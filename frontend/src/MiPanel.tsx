@@ -66,6 +66,7 @@ type Avance = {
   fecha: string
   cursoId: string
   lecciones: number
+  horas: number
   aprendizaje: string
 }
 
@@ -178,7 +179,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
     return onSnapshot(q, aplicarSnapshot, () => setLoading(false))
   }, [userId])
 
-  const [avancesTodos, setAvancesTodos] = useState<{ cursoId: string; lecciones: number }[]>([])
+  const [avancesTodos, setAvancesTodos] = useState<{ cursoId: string; lecciones: number; horas: number }[]>([])
 
   useEffect(() => {
     const q = query(collection(db, 'avances'), where('userId', '==', userId))
@@ -189,6 +190,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
           return {
             cursoId: (data.cursoId as string) ?? '',
             lecciones: (data.lecciones as number) ?? 0,
+            horas: (data.horas as number) ?? 0,
           }
         }),
       )
@@ -237,6 +239,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
             fecha: (data.fecha as string) ?? '',
             cursoId: (data.cursoId as string) ?? '',
             lecciones: (data.lecciones as number) ?? 0,
+            horas: (data.horas as number) ?? 0,
             aprendizaje: (data.aprendizaje as string) ?? '',
           }
         }),
@@ -247,7 +250,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
   const leccionesPorCursoActuales = useMemo(() => {
     const map = new Map<string, number>()
     avancesTodos.forEach((a) => {
-      map.set(a.cursoId, (map.get(a.cursoId) ?? 0) + a.lecciones)
+      map.set(a.cursoId, (map.get(a.cursoId) ?? 0) + a.lecciones + a.horas)
     })
     return map
   }, [avancesTodos])
@@ -586,7 +589,7 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                 <tr className="text-xs font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
                   <th className="pb-2 pr-4 font-semibold">Fecha</th>
                   <th className="pb-2 pr-4 font-semibold">Curso</th>
-                  <th className="pb-2 pr-4 font-semibold">Lecciones</th>
+                  <th className="pb-2 pr-4 font-semibold">Avance</th>
                   <th className="pb-2 font-semibold">Aprendizaje</th>
                 </tr>
               </thead>
@@ -599,7 +602,9 @@ export default function MiPanel({ nombre, userId, puedeCambiarPassword, onRegist
                     <td className="py-2.5 pr-4 font-medium text-gray-900 dark:text-gray-100">
                       {cursosPorId[r.cursoId]?.nombre ?? r.cursoId}
                     </td>
-                    <td className="py-2.5 pr-4 text-gray-500 dark:text-gray-400">{r.lecciones}</td>
+                    <td className="py-2.5 pr-4 text-gray-500 dark:text-gray-400">
+                      {r.horas > 0 ? `${r.horas} h` : r.lecciones}
+                    </td>
                     <td className="py-2.5 text-gray-500 dark:text-gray-400">{r.aprendizaje}</td>
                   </tr>
                 ))}

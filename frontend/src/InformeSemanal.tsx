@@ -52,6 +52,7 @@ type Avance = {
   cursoId: string
   fecha: string
   lecciones: number
+  horas: number
   aprendizaje: string
   creadoEn: Timestamp | null
 }
@@ -66,7 +67,7 @@ function iniciales(nombre: string): string {
   return letras || '?'
 }
 
-const equipos = ['Educación Continua', 'Unimetab', 'Academia']
+const equipos = ['Educación Continua', 'Unimetab', 'Academia', 'Poder del Conocimiento']
 
 function cumplimientoStyle(pct: number) {
   if (pct >= 100) return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
@@ -207,6 +208,7 @@ export default function InformeSemanal() {
             cursoId: (data.cursoId as string) ?? '',
             fecha: (data.fecha as string) ?? '',
             lecciones: (data.lecciones as number) ?? 0,
+            horas: (data.horas as number) ?? 0,
             aprendizaje: (data.aprendizaje as string) ?? '',
             creadoEn: (data.creadoEn as Timestamp | undefined) ?? null,
           }
@@ -254,7 +256,7 @@ export default function InformeSemanal() {
             horario,
             progreso,
             completaciones: avancesSemana.length,
-            lecciones: avancesSemana.reduce((s, a) => s + a.lecciones, 0),
+            lecciones: avancesSemana.reduce((s, a) => s + a.lecciones + a.horas, 0),
             observacion: avancesSemana[0]?.aprendizaje ?? '',
             programadasSemana: horario ? ocurrenciasEntre(horario, inicio, fin).length : 0,
           }

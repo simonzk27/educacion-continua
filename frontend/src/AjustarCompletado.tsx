@@ -27,6 +27,7 @@ type Curso = {
   nombre: string
   tipo: string
   duracionValor: number
+  duracionUnidad: string
 }
 
 type Inscripcion = {
@@ -72,6 +73,7 @@ export default function AjustarCompletado() {
           nombre: (data.nombre as string) ?? d.id,
           tipo: (data.tipo as string) ?? '',
           duracionValor: (data.duracionValor as number) ?? 0,
+          duracionUnidad: (data.duracionUnidad as string) ?? 'Lecciones',
         }
       })
       setCursosPorId(map)
@@ -98,7 +100,16 @@ export default function AjustarCompletado() {
     if (!selectedUserId) return []
     return inscripciones
       .filter((i) => i.userId === selectedUserId)
-      .map((i) => cursosPorId[i.cursoId] ?? { id: i.cursoId, nombre: i.cursoId, tipo: '', duracionValor: 0 })
+      .map(
+        (i) =>
+          cursosPorId[i.cursoId] ?? {
+            id: i.cursoId,
+            nombre: i.cursoId,
+            tipo: '',
+            duracionValor: 0,
+            duracionUnidad: 'Lecciones',
+          },
+      )
   }, [selectedUserId, inscripciones, cursosPorId])
 
   const cursoSeleccionado = selectedCursoId ? (cursosPorId[selectedCursoId] ?? null) : null
@@ -140,6 +151,51 @@ export default function AjustarCompletado() {
           userId: selectedUserId,
           cursoId: selectedCursoId,
           fecha: sinFecha ? '' : fecha,
+          aprendizaje: 'Curso completado (ajuste administrativo).',
+          comentario: null,
+          creadoEn: serverTimestamp(),
+        })
+        await updateDoc(doc(db, 'cursos', selectedCursoId, 'inscripciones', selectedUserId), {
+          completado: true,
+          confirmado: true,
+          fechaCompletado,
+        })
+      } else if (cursoSeleccionado.duracionUnidad === 'Horas') {
+        const total = cursoSeleccionado.duracionValor
+        if (total <= 0) {
+          setError('Este curso no tiene una duración configurada, no se puede completar.')
+          setGuardando(false)
+          return
+        }
+        const horasHechas = await new Promise<number>((resolve, reject) => {
+          const q = query(
+            collection(db, 'avances'),
+            where('userId', '==', selectedUserId),
+            where('cursoId', '==', selectedCursoId),
+          )
+          const unsub = onSnapshot(
+            q,
+            (snap) => {
+              unsub()
+              resolve(snap.docs.reduce((acc, d) => acc + ((d.data().horas as number) ?? 0), 0))
+            },
+            reject,
+          )
+        })
+
+        if (horasHechas >= total) {
+          setError('Este colaborador ya completó todas las horas de este curso.')
+          setGuardando(false)
+          return
+        }
+
+        await addDoc(collection(db, 'avances'), {
+          userId: selectedUserId,
+          cursoId: selectedCursoId,
+          fecha: sinFecha ? '' : fecha,
+          horaInicio: '00:00',
+          horaFin: '00:00',
+          horas: total - horasHechas,
           aprendizaje: 'Curso completado (ajuste administrativo).',
           comentario: null,
           creadoEn: serverTimestamp(),

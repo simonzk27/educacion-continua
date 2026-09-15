@@ -421,14 +421,19 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
     const semanas = Array.from({ length: 8 }, (_, i) => addDays(semanaActualInicio, -7 * (7 - i)))
     const totales: Record<string, Record<string, number>> = {}
     semanas.forEach((s) => {
-      totales[s] = { 'Educación Continua': 0, Unimetab: 0, Academia: 0 }
+      totales[s] = { 'Educación Continua': 0, Unimetab: 0, Academia: 0, 'Poder del Conocimiento': 0 }
     })
     avances.forEach((a) => {
       if (!a.fecha) return
       const semana = inicioSemanaLunes(a.fecha)
       if (!(semana in totales)) return
       const tipo = cursosPorId[a.cursoId]?.tipo
-      if (tipo === 'Educación Continua' || tipo === 'Unimetab' || tipo === 'Academia') {
+      if (
+        tipo === 'Educación Continua' ||
+        tipo === 'Unimetab' ||
+        tipo === 'Academia' ||
+        tipo === 'Poder del Conocimiento'
+      ) {
         totales[semana][tipo] += a.lecciones
       }
     })
@@ -594,7 +599,14 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   <Legend wrapperStyle={{ fontSize: 12, color: axisColor }} />
                   <Bar dataKey="Educación Continua" stackId="lecciones" fill="#2563eb" />
                   <Bar dataKey="Unimetab" stackId="lecciones" fill="#f59e0b" />
-                  <Bar dataKey="Academia" stackId="lecciones" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="Academia" stackId="lecciones" fill="#10b981" />
+                  <Bar
+                    dataKey="Poder del Conocimiento"
+                    stackId="lecciones"
+                    fill="#7c3aed"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={40}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -636,7 +648,7 @@ export default function Dashboard({ isAdmin }: DashboardProps) {
                   value={tipoCurso}
                   onChange={setTipoCurso}
                   className="w-96"
-                  options={['Todos', 'Educación Continua', 'Unimetab', 'Academia']}
+                  options={['Todos', 'Educación Continua', 'Unimetab', 'Academia', 'Poder del Conocimiento']}
                   ariaLabel="Tipo de curso"
                   colorFor={colorActivoTipoCurso}
                 />

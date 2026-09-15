@@ -27,13 +27,15 @@ import {
   todayIso,
 } from './scheduleUtils'
 
-type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
+type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab' | 'Poder del Conocimiento'
+type DuracionUnidad = 'Lecciones' | 'Horas'
 
 type Curso = {
   id: string
   nombre: string
   tipo: Tipo
   duracionValor: number
+  duracionUnidad: DuracionUnidad
   capitulos: number[] | null
 }
 
@@ -62,6 +64,7 @@ const emptyForm = {
   horaInicio: '',
   horaFin: '',
   leccionFinal: '',
+  horas: '',
   aprendizaje: '',
   comentario: '',
 }
@@ -100,6 +103,7 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
   const [inscripcionSeleccionada, setInscripcionSeleccionada] = useState<InscripcionSeleccionada | null>(null)
   const [avanceExistenteEC, setAvanceExistenteEC] = useState<boolean | null>(null)
   const [rangosRegistrados, setRangosRegistrados] = useState<{ leccionInicial: number; leccionFinal: number }[]>([])
+  const [horasRegistradas, setHorasRegistradas] = useState(0)
 
   useEffect(() => {
     function aplicarCursos(snap: QuerySnapshot) {
@@ -111,6 +115,7 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
           nombre: (data.nombre as string) ?? d.id,
           tipo: (data.tipo as Tipo) ?? 'Academia',
           duracionValor: (data.duracionValor as number) ?? 0,
+          duracionUnidad: (data.duracionUnidad as DuracionUnidad) ?? 'Lecciones',
           capitulos: (data.capitulos as number[] | undefined) ?? null,
         }
       })
@@ -172,6 +177,7 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
 
   const cursoSeleccionado = selectedCursoId ? (cursosPorId[selectedCursoId] ?? null) : null
   const esEducacionContinua = cursoSeleccionado?.tipo === 'Educación Continua'
+  const esHoras = !esEducacionContinua && cursoSeleccionado?.duracionUnidad === 'Horas'
 
   useEffect(() => {
     if (!selectedCursoId) {
@@ -319,7 +325,7 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
   }, [selectedCursoId])
 
   useEffect(() => {
-    if (!selectedCursoId || esEducacionContinua) {
+    if (!selectedCursoId || esEducacionContinua || esHoras) {
       setRangosRegistrados([])
       return
     }
@@ -341,7 +347,31 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
         .sort((a, b) => a.leccionInicial - b.leccionInicial)
       setRangosRegistrados(rangos)
     })
-  }, [selectedCursoId, esEducacionContinua, userId])
+  }, [selectedCursoId, esEducacionContinua, esHoras, userId])
+
+  useEffect(() => {
+    if (!selectedCursoId || !esHoras) {
+      setHorasRegistradas(0)
+      return
+    }
+    const q = query(
+      collection(db, 'avances'),
+      where('userId', '==', userId),
+      where('cursoId', '==', selectedCursoId),
+    )
+    return onSnapshot(q, (snap) => {
+      const total = snap.docs.reduce((acc, d) => acc + ((d.data().horas as number) ?? 0), 0)
+      setHorasRegistradas(total)
+    })
+  }, [selectedCursoId, esHoras, userId])
+
+  const horasInfo = useMemo(() => {
+    const total = cursoSeleccionado?.duracionValor ?? 0
+    const restantes = Math.max(0, total - horasRegistradas)
+    return { total, restantes }
+  }, [cursoSeleccionado, horasRegistradas])
+
+  const cursoCompletadoHoras = horasInfo.total > 0 && horasInfo.restantes <= 0
 
   function validar(): string | null {
     if (cursoCompletado) return 'Ya completaste todas las lecciones de este curso.'
@@ -403,6 +433,72 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
           0,
         )
         if (totalLecciones >= curso.duracionValor) {
+          await updateDoc(doc(db, 'cursos', selectedCursoId, 'inscripciones', userId), {
+            completado: true,
+            confirmado: true,
+            fechaCompletado: serverTimestamp(),
+          })
+        }
+      }
+
+      setGuardado(true)
+      setForm(emptyForm)
+    } catch {
+      setFormError('No se pudo guardar el avance. Intentá de nuevo.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function validarHoras(): string | null {
+    if (cursoCompletadoHoras) return 'Ya completaste todas las horas de este curso.'
+    if (!sesionObjetivo) return 'No tenés una sesión programada para registrar avance.'
+    if (!form.horaInicio) return 'Completá la hora de inicio.'
+    if (!form.horaFin) return 'Completá la hora de finalización.'
+    if (form.horaFin <= form.horaInicio) return 'La hora de finalización debe ser posterior a la hora de inicio.'
+    const horas = Number(form.horas)
+    if (!form.horas || !Number.isFinite(horas) || horas <= 0) return 'Indicá cuántas horas completaste.'
+    if (horas > horasInfo.restantes) return 'No podés registrar más horas de las que le quedan al curso.'
+    if (!form.aprendizaje.trim()) return 'Contanos tu principal aprendizaje de la sesión.'
+    return null
+  }
+
+  async function handleSubmitHoras(e: FormEvent) {
+    e.preventDefault()
+    const err = validarHoras()
+    if (err) {
+      setFormError(err)
+      return
+    }
+    if (!sesionObjetivo || !selectedCursoId) return
+    setFormError(null)
+    setSubmitting(true)
+    try {
+      const horas = Number(form.horas)
+      await addDoc(collection(db, 'avances'), {
+        userId,
+        cursoId: selectedCursoId,
+        fecha: form.fecha,
+        horaInicio: form.horaInicio,
+        horaFin: form.horaFin,
+        horas,
+        aprendizaje: form.aprendizaje.trim(),
+        comentario: form.comentario.trim() || null,
+        creadoEn: serverTimestamp(),
+      })
+      setHorasRegistradas((prev) => prev + horas)
+
+      const curso = cursosPorId[selectedCursoId]
+      if (curso && curso.duracionValor > 0) {
+        const avancesSnap = await getDocs(
+          query(
+            collection(db, 'avances'),
+            where('userId', '==', userId),
+            where('cursoId', '==', selectedCursoId),
+          ),
+        )
+        const totalHoras = avancesSnap.docs.reduce((acc, d) => acc + ((d.data().horas as number) ?? 0), 0)
+        if (totalHoras >= curso.duracionValor) {
           await updateDoc(doc(db, 'cursos', selectedCursoId, 'inscripciones', userId), {
             completado: true,
             confirmado: true,
@@ -591,6 +687,165 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                 </form>
               )}
             </div>
+          ) : esHoras ? (
+            cursoCompletadoHoras ? (
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Ya completaste todas las horas de este curso.
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {inscripcionSeleccionada?.confirmado
+                      ? 'Completado y confirmado.'
+                      : 'Registro completo. Pendiente de confirmación por un administrador.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {sesionObjetivo ? (
+                  <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-400 p-6 text-white shadow-sm dark:from-indigo-500 dark:to-indigo-400">
+                    <p className="text-xs font-medium tracking-wide text-blue-100 uppercase dark:text-indigo-100">
+                      Sesión más próxima programada
+                    </p>
+                    <h2 className="mt-1 text-xl font-bold">{sesionObjetivo.cursoNombre}</h2>
+                    <p className="mt-1 flex items-center gap-1.5 text-sm text-blue-50 dark:text-indigo-50">
+                      <Clock className="h-4 w-4" />
+                      {formatFechaSesion(sesionObjetivo.fecha)} · {formatHora(sesionObjetivo.hora)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-gray-200 py-8 text-gray-400 dark:border-gray-800 dark:text-gray-500">
+                    <Inbox className="h-7 w-7" />
+                    <p className="text-sm">No tenés ninguna sesión programada todavía.</p>
+                  </div>
+                )}
+
+                <form
+                  onSubmit={handleSubmitHoras}
+                  className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
+                >
+                  <div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Fecha <span className="font-normal text-gray-400 dark:text-gray-500">(automática)</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={form.fecha}
+                          disabled
+                          className={`${dateTimeInputClass} disabled:opacity-70`}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Hora de inicio <span className="text-red-500">*</span>
+                        </label>
+                        <TimePicker
+                          value={form.horaInicio}
+                          onChange={(horaInicio) => setForm({ ...form, horaInicio })}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Hora de fin <span className="text-red-500">*</span>
+                        </label>
+                        <TimePicker
+                          value={form.horaFin}
+                          onChange={(horaFin) => setForm({ ...form, horaFin })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-100 dark:border-gray-800" />
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label htmlFor="horasCompletadas" className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Horas completadas en esta sesión <span className="text-red-500">*</span>
+                      </label>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {horasRegistradas}/{horasInfo.total} horas
+                      </span>
+                    </div>
+                    <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                      <div
+                        className="h-full rounded-full bg-violet-600 transition-all dark:bg-violet-500"
+                        style={{
+                          width: `${horasInfo.total > 0 ? Math.min(100, (horasRegistradas / horasInfo.total) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <input
+                      id="horasCompletadas"
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      max={horasInfo.restantes}
+                      value={form.horas}
+                      onChange={(e) => setForm({ ...form, horas: e.target.value })}
+                      placeholder={`Máximo ${horasInfo.restantes} horas restantes`}
+                      className={dateTimeInputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      ¿Cuál fue tu principal aprendizaje o ganancia de esta sesión?{' '}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      maxLength={300}
+                      value={form.aprendizaje}
+                      onChange={(e) => setForm({ ...form, aprendizaje: e.target.value })}
+                      placeholder="Entendí cómo..."
+                      className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                    <p className="mt-1 text-right text-xs text-gray-400 dark:text-gray-500">
+                      {form.aprendizaje.length}/300
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Comentario adicional{' '}
+                      <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      maxLength={500}
+                      value={form.comentario}
+                      onChange={(e) => setForm({ ...form, comentario: e.target.value })}
+                      placeholder="Algo más que quieras registrar..."
+                      className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                    <p className="mt-1 text-right text-xs text-gray-400 dark:text-gray-500">
+                      {form.comentario.length}/500
+                    </p>
+                  </div>
+
+                  {formError && <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>}
+
+                  <button
+                    type="submit"
+                    disabled={submitting || !sesionObjetivo}
+                    className="w-full rounded-xl bg-violet-600 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-600"
+                  >
+                    {submitting ? 'Guardando...' : 'Guardar avance'}
+                  </button>
+
+                  {guardado && (
+                    <p className="flex items-center justify-center gap-1.5 text-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Avance guardado correctamente.
+                    </p>
+                  )}
+                </form>
+              </>
+            )
           ) : cursoCompletado ? (
             <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
               <div className="flex flex-col gap-1">

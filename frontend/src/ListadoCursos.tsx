@@ -17,6 +17,7 @@ import {
   GraduationCap,
   BookText,
   Building2,
+  Lightbulb,
 } from 'lucide-react'
 import {
   collection,
@@ -40,8 +41,8 @@ import { estiloTipoCurso } from './tipoCursoColors'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
 
 type Estado = 'Activo' | 'Inactivo' | 'Próximo'
-type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab'
-type DuracionUnidad = 'Lecciones'
+type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab' | 'Poder del Conocimiento'
+type DuracionUnidad = 'Lecciones' | 'Horas'
 type Tab = 'Todos los cursos' | Tipo
 
 type Curso = {
@@ -77,7 +78,7 @@ function normalizar(texto: string): string {
 }
 
 const estados: Estado[] = ['Activo', 'Inactivo', 'Próximo']
-const tabs: Tab[] = ['Todos los cursos', 'Educación Continua', 'Academia', 'Unimetab']
+const tabs: Tab[] = ['Todos los cursos', 'Educación Continua', 'Academia', 'Unimetab', 'Poder del Conocimiento']
 
 const emptyForm = {
   nombre: '',
@@ -251,6 +252,7 @@ export default function ListadoCursos() {
   const totalLeccionesForm = form.capitulos.reduce((acc, v) => acc + (Number(v) > 0 ? Number(v) : 0), 0)
   const formEsUnimetab = form.tipo === 'Unimetab'
   const formEsEC = form.tipo === 'Educación Continua'
+  const formEsPdC = form.tipo === 'Poder del Conocimiento'
 
   function rangoCapitulo(index: number): { inicio: number; fin: number } | null {
     const n = Number(form.capitulos[index])
@@ -331,7 +333,7 @@ export default function ListadoCursos() {
         setFormError('Completá todos los campos.')
         return
       }
-      duracionUnidad = form.duracionUnidad
+      duracionUnidad = form.tipo === 'Poder del Conocimiento' ? form.duracionUnidad : 'Lecciones'
       capitulos = null
     }
 
@@ -629,12 +631,13 @@ export default function ListadoCursos() {
 
               <div>
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de curso</span>
-                <div className="mt-1.5 grid grid-cols-3 gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800 sm:grid-cols-4">
                   {(
                     [
                       { valor: 'Educación Continua', icono: GraduationCap },
                       { valor: 'Academia', icono: BookText },
                       { valor: 'Unimetab', icono: Building2 },
+                      { valor: 'Poder del Conocimiento', icono: Lightbulb },
                     ] as const
                   ).map(({ valor, icono: Icono }) => (
                     <button
@@ -722,18 +725,43 @@ export default function ListadoCursos() {
                   </button>
                 </div>
               ) : (
-                <div className="animate-fade-in">
-                  <label htmlFor="duracionValor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Duración (lecciones)
-                  </label>
-                  <input
-                    id="duracionValor"
-                    type="number"
-                    min="1"
-                    value={form.duracionValor}
-                    onChange={(e) => setForm({ ...form, duracionValor: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
-                  />
+                <div className="animate-fade-in flex flex-col gap-3">
+                  {formEsPdC && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Unidad de duración
+                      </span>
+                      <div className="mt-1.5 grid grid-cols-2 gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                        {(['Lecciones', 'Horas'] as const).map((valor) => (
+                          <button
+                            key={valor}
+                            type="button"
+                            onClick={() => setForm({ ...form, duracionUnidad: valor })}
+                            className={`rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                              form.duracionUnidad === valor
+                                ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-950 dark:text-violet-400'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                          >
+                            {valor}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label htmlFor="duracionValor" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Duración ({(formEsPdC ? form.duracionUnidad : 'Lecciones').toLowerCase()})
+                    </label>
+                    <input
+                      id="duracionValor"
+                      type="number"
+                      min="1"
+                      value={form.duracionValor}
+                      onChange={(e) => setForm({ ...form, duracionValor: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 outline-none transition-colors focus:border-blue-400 focus:ring-1 focus:ring-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+                    />
+                  </div>
                 </div>
               )}
 
