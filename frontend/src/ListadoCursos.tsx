@@ -18,6 +18,7 @@ import {
   BookText,
   Building2,
   Lightbulb,
+  CalendarClock,
 } from 'lucide-react'
 import {
   collection,
@@ -39,6 +40,7 @@ import { db } from './firebase'
 import Select from './Select'
 import { estiloTipoCurso } from './tipoCursoColors'
 import { ordenarPorNombreYFecha, ordenOpciones, type OrdenOpcion } from './sortUtils'
+import HorarioFormModal, { type HorarioExistente } from './HorarioFormModal'
 
 type Estado = 'Activo' | 'Inactivo' | 'Próximo'
 type Tipo = 'Educación Continua' | 'Academia' | 'Unimetab' | 'Poder del Conocimiento'
@@ -119,6 +121,8 @@ export default function ListadoCursos() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set())
   const [assigningId, setAssigningId] = useState<string | null>(null)
+  const [horariosPorUsuario, setHorariosPorUsuario] = useState<Record<string, HorarioExistente>>({})
+  const [horarioTarget, setHorarioTarget] = useState<Usuario | null>(null)
   const [search, setSearch] = useState('')
   const [asignacionFiltro, setAsignacionFiltro] = useState<AsignacionFiltro>('Todos')
   const [cursoSearch, setCursoSearch] = useState('')
@@ -167,6 +171,27 @@ export default function ListadoCursos() {
     })
   }, [assignCurso])
 
+  useEffect(() => {
+    if (!assignCurso) return
+    return onSnapshot(query(collection(db, 'horarios'), where('cursoId', '==', assignCurso.id)), (snap) => {
+      const map: Record<string, HorarioExistente> = {}
+      snap.docs.forEach((d) => {
+        const data = d.data()
+        const userId = data.userId as string | undefined
+        if (!userId) return
+        map[userId] = {
+          modo: (data.modo as HorarioExistente['modo']) ?? 'semanal',
+          dias: (data.dias as HorarioExistente['dias']) ?? [],
+          fechas: (data.fechas as string[]) ?? [],
+          hora: (data.hora as string | undefined) ?? null,
+          duracionMin: (data.duracionMin as number | undefined) ?? null,
+          vigenciaInicio: (data.vigenciaInicio as string | undefined) ?? null,
+        }
+      })
+      setHorariosPorUsuario(map)
+    })
+  }, [assignCurso])
+
   const porTab = tab === 'Todos los cursos' ? cursos : cursos.filter((c) => c.tipo === tab)
   const terminoCurso = normalizar(cursoSearch.trim())
   const palabrasCurso = terminoCurso.split(/\s+/).filter(Boolean)
@@ -195,6 +220,7 @@ export default function ListadoCursos() {
     setAssignCurso(null)
     setUsuarios([])
     setAssignedIds(new Set())
+    setHorariosPorUsuario({})
   }
 
   async function handleAssign(usuario: Usuario) {
@@ -210,6 +236,7 @@ export default function ListadoCursos() {
       })
       await updateDoc(doc(db, 'cursos', assignCurso.id), { inscritos: increment(1) })
       setToast(`${usuario.nombre} asignado a ${assignCurso.nombre}.`)
+      setHorarioTarget(usuario)
     } catch {
       setToast(null)
     } finally {
@@ -912,34 +939,46 @@ export default function ListadoCursos() {
                             </p>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          disabled={assigningId === u.id}
-                          onClick={() => (asignado ? handleUnassign(u) : handleAssign(u))}
-                          title={asignado ? 'Quitar del curso' : undefined}
-                          className={`group flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
-                            asignado
-                              ? 'bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:text-red-600 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-red-500/10 dark:hover:text-red-400'
-                              : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-indigo-500 dark:hover:bg-indigo-600'
-                          }`}
-                        >
-                          {asignado ? (
-                            assigningId === u.id ? (
-                              'Quitando...'
-                            ) : (
-                              <>
-                                <Check className="h-3.5 w-3.5 group-hover:hidden" />
-                                <X className="hidden h-3.5 w-3.5 group-hover:inline" />
-                                <span className="group-hover:hidden">Asignado</span>
-                                <span className="hidden group-hover:inline">Quitar</span>
-                              </>
-                            )
-                          ) : assigningId === u.id ? (
-                            'Asignando...'
-                          ) : (
-                            'Asignar'
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {asignado && (
+                            <button
+                              type="button"
+                              onClick={() => setHorarioTarget(u)}
+                              title="Asignar horario"
+                              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400"
+                            >
+                              <CalendarClock className="h-4 w-4" />
+                            </button>
                           )}
-                        </button>
+                          <button
+                            type="button"
+                            disabled={assigningId === u.id}
+                            onClick={() => (asignado ? handleUnassign(u) : handleAssign(u))}
+                            title={asignado ? 'Quitar del curso' : undefined}
+                            className={`group flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+                              asignado
+                                ? 'bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:text-red-600 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-red-500/10 dark:hover:text-red-400'
+                                : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-indigo-500 dark:hover:bg-indigo-600'
+                            }`}
+                          >
+                            {asignado ? (
+                              assigningId === u.id ? (
+                                'Quitando...'
+                              ) : (
+                                <>
+                                  <Check className="h-3.5 w-3.5 group-hover:hidden" />
+                                  <X className="hidden h-3.5 w-3.5 group-hover:inline" />
+                                  <span className="group-hover:hidden">Asignado</span>
+                                  <span className="hidden group-hover:inline">Quitar</span>
+                                </>
+                              )
+                            ) : assigningId === u.id ? (
+                              'Asignando...'
+                            ) : (
+                              'Asignar'
+                            )}
+                          </button>
+                        </div>
                       </li>
                     )
                   })}
@@ -974,6 +1013,21 @@ export default function ListadoCursos() {
             )}
           </div>
         </div>
+      )}
+
+      {assignCurso && horarioTarget && (
+        <HorarioFormModal
+          userId={horarioTarget.id}
+          cursoId={assignCurso.id}
+          colaborador={horarioTarget.nombre}
+          curso={assignCurso.nombre}
+          horario={horariosPorUsuario[horarioTarget.id] ?? null}
+          onClose={() => setHorarioTarget(null)}
+          onSaved={() => {
+            setToast(`Horario guardado para ${horarioTarget.nombre}.`)
+            setHorarioTarget(null)
+          }}
+        />
       )}
 
       {deleting && (
