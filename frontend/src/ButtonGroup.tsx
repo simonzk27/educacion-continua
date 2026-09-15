@@ -4,6 +4,7 @@ type ButtonGroupProps = {
   readonly options: readonly string[]
   readonly className?: string
   readonly ariaLabel?: string
+  readonly labelledBy?: string
   readonly colorFor?: (opt: string) => string | undefined
   readonly iconFor?: (opt: string) => React.ReactNode | undefined
   readonly noWrap?: boolean
@@ -15,6 +16,7 @@ export default function ButtonGroup({
   options,
   className = '',
   ariaLabel,
+  labelledBy,
   colorFor,
   iconFor,
   noWrap,
@@ -22,7 +24,8 @@ export default function ButtonGroup({
   return (
     <div
       role="group"
-      aria-label={ariaLabel}
+      aria-label={labelledBy ? undefined : ariaLabel}
+      aria-labelledby={labelledBy}
       className={`grid gap-1.5 rounded-xl bg-gray-100 p-1 dark:bg-gray-800 ${className}`}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >

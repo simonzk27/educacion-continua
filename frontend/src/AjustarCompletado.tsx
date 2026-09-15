@@ -287,10 +287,11 @@ export default function AjustarCompletado() {
 
       <div className="flex flex-col gap-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+          <label htmlFor="ajustarColaborador" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
             Colaborador <span className="text-red-500">*</span>
           </label>
           <Select
+            id="ajustarColaborador"
             value={selectedUserId ?? ''}
             onChange={(v) => setSelectedUserId(v || null)}
             placeholder="Selecciona un colaborador..."
@@ -301,7 +302,7 @@ export default function AjustarCompletado() {
 
         {selectedUserId && (
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+            <label htmlFor="ajustarCurso" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
               Curso <span className="text-red-500">*</span>
             </label>
             {cursosDelUsuario.length === 0 ? (
@@ -310,6 +311,7 @@ export default function AjustarCompletado() {
               </p>
             ) : (
               <Select
+                id="ajustarCurso"
                 value={selectedCursoId ?? ''}
                 onChange={(v) => setSelectedCursoId(v || null)}
                 placeholder="Selecciona un curso..."

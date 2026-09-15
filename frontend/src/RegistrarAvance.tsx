@@ -583,10 +583,11 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
         <>
           {cursoIds.length > 1 && (
             <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+              <label htmlFor="registrarCurso" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                 Selecciona el curso <span className="text-red-500">*</span>
               </label>
               <Select
+                id="registrarCurso"
                 value={selectedCursoId ?? ''}
                 onChange={(v) => setSelectedCursoId(v || null)}
                 placeholder="Selecciona un curso..."
@@ -622,10 +623,11 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
               ) : (
                 <form onSubmit={handleSubmitEC} className="flex flex-col gap-5">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <label htmlFor="ecFecha" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                       Fecha <span className="text-red-500">*</span>
                     </label>
                     <DatePicker
+                      id="ecFecha"
                       value={formEC.fecha}
                       onChange={(fecha) => setFormEC({ ...formEC, fecha })}
                       minDate={todayIso()}
@@ -633,11 +635,12 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <label htmlFor="ecAprendizaje" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                       ¿Cuál fue tu principal aprendizaje o ganancia de este curso?{' '}
                       <span className="text-red-500">*</span>
                     </label>
                     <textarea
+                      id="ecAprendizaje"
                       rows={3}
                       maxLength={300}
                       value={formEC.aprendizaje}
@@ -651,11 +654,12 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <label htmlFor="ecComentario" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                       Comentario adicional{' '}
                       <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
                     </label>
                     <textarea
+                      id="ecComentario"
                       rows={3}
                       maxLength={500}
                       value={formEC.comentario}
@@ -728,10 +732,11 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                   <div>
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <label htmlFor="horasFecha" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                           Fecha <span className="font-normal text-gray-400 dark:text-gray-500">(automática)</span>
                         </label>
                         <input
+                          id="horasFecha"
                           type="date"
                           value={form.fecha}
                           disabled
@@ -739,19 +744,21 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <label htmlFor="horasInicio" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                           Hora de inicio <span className="text-red-500">*</span>
                         </label>
                         <TimePicker
+                          id="horasInicio"
                           value={form.horaInicio}
                           onChange={(horaInicio) => setForm({ ...form, horaInicio })}
                         />
                       </div>
                       <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <label htmlFor="horasFin" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                           Hora de fin <span className="text-red-500">*</span>
                         </label>
                         <TimePicker
+                          id="horasFin"
                           value={form.horaFin}
                           onChange={(horaFin) => setForm({ ...form, horaFin })}
                         />
@@ -792,11 +799,12 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <label htmlFor="horasAprendizaje" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                       ¿Cuál fue tu principal aprendizaje o ganancia de esta sesión?{' '}
                       <span className="text-red-500">*</span>
                     </label>
                     <textarea
+                      id="horasAprendizaje"
                       rows={3}
                       maxLength={300}
                       value={form.aprendizaje}
@@ -810,11 +818,12 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <label htmlFor="horasComentario" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                       Comentario adicional{' '}
                       <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
                     </label>
                     <textarea
+                      id="horasComentario"
                       rows={3}
                       maxLength={500}
                       value={form.comentario}
@@ -886,10 +895,11 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                 <div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <label htmlFor="leccionesFecha" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Fecha <span className="font-normal text-gray-400 dark:text-gray-500">(automática)</span>
                       </label>
                       <input
+                        id="leccionesFecha"
                         type="date"
                         value={form.fecha}
                         disabled
@@ -897,19 +907,21 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <label htmlFor="leccionesInicio" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Hora de inicio <span className="text-red-500">*</span>
                       </label>
                       <TimePicker
+                        id="leccionesInicio"
                         value={form.horaInicio}
                         onChange={(horaInicio) => setForm({ ...form, horaInicio })}
                       />
                     </div>
                     <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <label htmlFor="leccionesFin" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Hora de fin <span className="text-red-500">*</span>
                       </label>
                       <TimePicker
+                        id="leccionesFin"
                         value={form.horaFin}
                         onChange={(horaFin) => setForm({ ...form, horaFin })}
                       />
@@ -952,9 +964,9 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                 ) : (
                   <div>
                     <div className="mb-3 flex items-center justify-between">
-                      <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <span id="leccionesGrupoLabel" className="block text-sm font-medium text-gray-900 dark:text-gray-100">
                         Lecciones de esta sesión <span className="text-red-500">*</span>
-                      </label>
+                      </span>
                       <span className="text-xs text-gray-400 dark:text-gray-500">
                         {form.leccionFinal && proximaLeccion !== null
                           ? `Seleccionado: ${leccionRelativa(proximaLeccion)}–${leccionRelativa(Number(form.leccionFinal))}`
@@ -967,7 +979,7 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                       Empezás automáticamente desde la lección {proximaLeccion !== null ? leccionRelativa(proximaLeccion) : ''}. Tocá hasta dónde llegaste. Las
                       lecciones en gris ya fueron registradas antes.
                     </p>
-                    <div className="flex flex-col gap-3">
+                    <div role="group" aria-labelledby="leccionesGrupoLabel" className="flex flex-col gap-3">
                       {(capitulosInfo.length > 0
                         ? capitulosInfo
                         : [{ numero: 0, inicio: 1, fin: leccionesInfo.total, lecciones: leccionesInfo.total }]
@@ -1015,11 +1027,12 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                 )}
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <label htmlFor="leccionesAprendizaje" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                     ¿Cuál fue tu principal aprendizaje o ganancia de esta sesión?{' '}
                     <span className="text-red-500">*</span>
                   </label>
                   <textarea
+                    id="leccionesAprendizaje"
                     rows={3}
                     maxLength={300}
                     value={form.aprendizaje}
@@ -1033,11 +1046,12 @@ export default function RegistrarAvance({ userId, preselectCursoId }: RegistrarA
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <label htmlFor="leccionesComentario" className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
                     Comentario adicional{' '}
                     <span className="font-normal text-gray-400 dark:text-gray-500">(opcional)</span>
                   </label>
                   <textarea
+                    id="leccionesComentario"
                     rows={3}
                     maxLength={500}
                     value={form.comentario}

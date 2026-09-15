@@ -180,10 +180,11 @@ export default function Tablero({ isAdmin }: TableroProps) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Buscar colaborador</label>
+          <label htmlFor="tableroBuscarColaborador" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Buscar colaborador</label>
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <input
+              id="tableroBuscarColaborador"
               type="text"
               value={buscar}
               onChange={(e) => setBuscar(e.target.value)}
@@ -193,7 +194,7 @@ export default function Tablero({ isAdmin }: TableroProps) {
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Equipo</label>
+          <span id="tableroEquipoLabel" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Equipo</span>
           <ButtonGroup
             value={equipoFiltro}
             onChange={setEquipoFiltro}
@@ -201,21 +202,24 @@ export default function Tablero({ isAdmin }: TableroProps) {
             options={['Todos', ...equiposOpciones]}
             iconFor={iconoEquipo}
             noWrap
+            labelledBy="tableroEquipoLabel"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Tipo de curso</label>
+          <span id="tableroTipoCursoLabel" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Tipo de curso</span>
           <ButtonGroup
             value={tipoCursoFiltro}
             onChange={setTipoCursoFiltro}
             className="w-96"
             options={['Todos', ...tiposCursoOpciones]}
             colorFor={colorActivoTipoCurso}
+            labelledBy="tableroTipoCursoLabel"
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Curso</label>
+          <label htmlFor="tableroCursoFiltro" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Curso</label>
           <Select
+            id="tableroCursoFiltro"
             value={cursoFiltro}
             onChange={setCursoFiltro}
             className="w-44"
@@ -224,8 +228,9 @@ export default function Tablero({ isAdmin }: TableroProps) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Ordenar</label>
+          <label htmlFor="tableroOrdenFiltro" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Ordenar</label>
           <Select
+            id="tableroOrdenFiltro"
             value={orden}
             onChange={(v) => setOrden(v as OrdenOpcion)}
             className="w-44"
